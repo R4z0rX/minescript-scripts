@@ -4,8 +4,23 @@
 **Author:** RazrCraft  
 **Date:** 2025-07-12
 
-User-friendly API for scripts that adds extra functionality to the Minescript mod, using [`lib_java`](src/lib/lib_java.py ) and other libraries.  
+User-friendly API for scripts that adds extra functionality to the Minescript mod, using [`lib_java`](https://minescript.net/sdm_downloads/lib_java-v2/) and other libraries.  
 This module should be imported by other scripts and not run directly.
+
+---
+
+## Usage
+
+First you need to download minescript_plus.py and place it in the /minescript folder (where config.txt is located, and probably your scripts too).
+
+Import the module in your script:
+
+```python
+from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Util
+```
+
+You don't need to import all the classes, just the ones you need.
+Use the classes and methods as shown in the examples below to interact with Minecraft via Minescript Plus.
 
 ---
 
@@ -187,15 +202,54 @@ Utility methods.
 
 ---
 
-## Usage
+## Events
 
-Import the module in your script:
+### [`Event`](Minescript-Plus/minescript_plus.py)
+Provides an event system for registering and handling custom or built-in Minescript Plus events.
 
+- **register(event_name: str, callback: Callable, once: bool = False) -> Listener**  
+  Registers a callback for the specified event name.  
+  If `once` is `True`, the listener will automatically unregister after the first trigger.  
+  *Returns:* A `Listener` instance, which can be manually unregistered.
+
+- **event(func: Callable) -> Callable**  
+  Decorator that marks a function as an event listener.  
+  The function name must match the event name.  
+  All decorated functions must be activated later using `Event.activate_all()`.
+
+- **activate_all() -> None**  
+  Starts all listeners that were registered using the `@Event.event` decorator.
+
+**Examples:**
+
+Registering an existing event manually:
 ```python
-from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Util
+from minescript_plus import Event
+
+def on_actionbar(text: str):
+    print(f"Actionbar updated: {text}")
+
+# In your main asyncio function:
+listener = await Event.register("on_actionbar", on_actionbar)
 ```
 
-Use the classes and methods as shown in the examples above to interact with Minecraft via Minescript Plus.
+Registering an event using the decorator:
+```python
+from minescript_plus import Event
+
+@Event.event
+def on_actionbar(text: str):
+    print(f"Actionbar updated: {text}")
+
+# Later, in your main asyncio function:
+await Event.activate_all()
+```
+
+---
+
+## Notes
+
+As this is an alpha version, expect possible breaking changes in the future.
 
 ---
 
