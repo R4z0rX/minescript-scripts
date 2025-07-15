@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.6-alpha
+    Version: 0.7-alpha
     Author: RazrCraft
-    Date: 2025-07-12
+    Date: 2025-07-15
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -17,7 +17,8 @@ import asyncio
 from time import sleep
 from typing import Callable, Literal
 from minescript import (script_loop, render_loop, ItemStack, TargetedBlock, version_info, player_inventory,
-                        player_get_targeted_block, press_key_bind, screen_name, player_name, job_info)
+                        player_get_targeted_block, press_key_bind, screen_name, player_name, job_info,
+                        container_get_items)
 from lib_java import JavaClass, java_class_map, java_member_map
 import lib_nbt
 
@@ -27,11 +28,12 @@ with script_loop:
     _events = {}
 
     class EventDefinition:
-        def __init__(self, name: str, mode: EventMode, flag: bool = False, condition: Callable | None = None):
+        def __init__(self, name: str, mode: EventMode, flag: bool = False, condition: Callable | None = None, interval: float | None = None):
             self.name: str = name
             self.mode: EventMode = mode  # "flag" or "callback"
             self.flag: bool = flag
             self.condition: Callable = condition
+            self.interval = interval
 
         def get_condition(self):
             if self.mode == "flag":
@@ -49,7 +51,7 @@ with script_loop:
             condition_function: Callable,
             once: bool,
             manager,
-            check_interval: float = 1.0,
+            check_interval: float = 0.5,
         ):
             self.event_name: str = event_name
             self.callback: Callable = callback
@@ -89,6 +91,7 @@ with script_loop:
                            ) -> Listener:
             event_def = _events[event_name]
             condition = event_def.get_condition()
+            event_interval = event_def.interval
 
             listener = Listener(
                 event_name=event_name,
@@ -96,7 +99,7 @@ with script_loop:
                 condition_function=condition,
                 once=once,
                 manager=cls,
-                check_interval=check_interval
+                check_interval=event_interval or check_interval
             )
             cls._listeners.append(listener)
             listener.start()
@@ -160,6 +163,12 @@ with script_loop:
         if r is not None:
             return True, (r,), {}
         return False, (), {}
+    
+    def __open_screen_event_callback():
+        r = screen_name()
+        if r is not None:
+            return True, (r,), {}
+        return False, (), {}
 
 with script_loop:
     Event.define_event(EventDefinition(
@@ -168,7 +177,8 @@ with script_loop:
         "on_subtitle", mode="callback", condition=__subtitle_event_callback))
     Event.define_event(EventDefinition(
         "on_actionbar", mode="callback", condition=__actionbar_event_callback))
-
+    Event.define_event(EventDefinition(
+        "on_open_screen", mode="callback", condition=__open_screen_event_callback, interval=0.05))
 
 # Mojang -> Intermediary mappings
 mc_class_name = version_info().minecraft_class_name
@@ -194,6 +204,8 @@ if mc_class_name == "net.minecraft.class_310":
         "protocol": "field_3756",
         "version": "field_3760",
         "playerList": "field_3762",
+        "pauseGame": "method_20539", # openGameMenu
+        "isLocalServer": "method_1542", # isInSingleplayer
         "isLan": "method_2994",
         "isRealm": "method_52811",
         "getLatency": "method_2959",
@@ -241,7 +253,12 @@ if mc_class_name == "net.minecraft.class_310":
         "click": "method_1420",                 # onKeyPressed(InputUtil$Key key)
         "set": "method_1416",                   # setKeyPressed(InputUtil$Key key, boolean pressed)
         "getKey": "method_15981",               # fromTranslationKey(String translationKey)
-        "UNKNOWN": "field_16237"                # UNKNOWN_KEY
+        "UNKNOWN": "field_16237",               # UNKNOWN_KEY
+        "getFoodData": "method_7344",           # getHungerManager
+        "getFoodLevel": "method_7586",
+        "setFoodLevel": "method_7580",
+        "getSaturationLevel": "method_7589",
+        "setSaturation": "method_7581"
     })
 
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
@@ -346,7 +363,6 @@ class Inventory:
         """
         block: TargetedBlock | None = player_get_targeted_block()
         if block is not None and "chest" not in block.type and "shulker_box" not in block.type:
-            print(block.type)
             return False
 
         press_key_bind("key.use", True)
@@ -378,18 +394,41 @@ class Inventory:
         return True
 
     @staticmethod
-    def find_item(item_id: str, cust_name: str = "") -> int | None:
+    def find_item(item_id: str, cust_name: str = "", container: bool=False, try_open: bool=False) -> int | None:
         """
-        Finds the first inventory slot containing a specified item, optionally matching a custom name.
+        Finds the first inventory slot containing a specific item, optionally by matching a custom name, and optionally by 
+        searching an already opened container, or attempting to open a targeted one.
         Args:
             item_id (str): The ID of the item to search for.
             cust_name (str, optional): The custom name to match. If empty, only the item ID is considered. Defaults to "".
+            container (bool, optional): If True, searches in the currently open container instead of the player's inventory. Defaults to False.
+            try_open (bool, optional): If True and container is True, attempts to open the targeted chest before searching. Defaults to False.
         Returns:
             int | None: The slot ID of the first matching item, or None if not found.
         Notes:
-            Slots ID: hotbar = 0-8, main = 9-35, offhand = 40, boots, leggins, chestplate, helmet = 36-39
+            If try_open is True, then the function will close it after getting the items.
+            Slot IDs:
+                Player inventory: hotbar = 0-8, main = 9-35, offhand = 40, boots, leggins, chestplate, helmet = 36-39
+                Single chest / Trap chest / Ender chest / Shulker box: 0-26
+                Double chest: 0-53
+                If you need to access the player's main inventory or hotbar with an open container, you must add the 
+                container's size to the slot IDs. For example, if you have an open double chest, its size is 54 slots, 
+                then the hotbar slots IDs will be from 0+54=54 to 8+54=62, and the main inventory will be from 9+54=63 
+                to 35+54=89.
         """
-        items: list[ItemStack] = player_inventory()
+        if not container:
+            items: list[ItemStack] = player_inventory()
+        else:
+            if try_open:
+                if not Inventory.open_targeted_chest():
+                    return None
+            items: list[ItemStack] = container_get_items()
+            if try_open:
+                Screen.close_screen()
+        if items is None:
+            #return None
+            raise Exception("Error: You need an open container.") # pylint: disable=W0719
+        
         fi = filter(lambda x: x.item == item_id, items)
         if cust_name == "":
             try:
@@ -618,6 +657,20 @@ class Key:
 
 class Client:
     @staticmethod
+    def pause_game(pause_only: bool=False):
+        mc.pauseGame(pause_only)
+        
+    @staticmethod
+    def is_local_server() -> bool:
+        """
+        Retrieves if the server is running locally (is single player).
+
+        Returns:
+            bool: True if it's a local server, False otherwise.
+        """
+        return mc.isLocalServer() # type: ignore
+    
+    @staticmethod
     def disconnect():
         """
         Disconnects the current Minecraft network connection with a custom message.
@@ -683,6 +736,16 @@ class Player:
         """
         name = player_name()
         return Player.__get_player_info(name).getSkin().textureUrl() # type: ignore
+
+    @staticmethod
+    def get_food_level() -> float:
+        foodStats = mc.player.getFoodData()
+        return foodStats.getFoodLevel() # type: ignore
+    
+    @staticmethod
+    def get_saturation_level() -> float:
+        foodStats = mc.player.getFoodData()
+        return foodStats.getSaturationLevel().value # type: ignore
 
 # # # SERVER # # #
 

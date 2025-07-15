@@ -19,7 +19,7 @@ Import the module in your script:
 from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Util
 ```
 
-You don't need to import all the classes, just the ones you need.
+You don't need to import all the classes, just the ones you need. \
 Use the classes and methods as shown in the examples below to interact with Minecraft via Minescript Plus.
 
 ---
@@ -27,7 +27,12 @@ Use the classes and methods as shown in the examples below to interact with Mine
 ## Classes & Methods
 
 ### [`Inventory`](Minescript-Plus/minescript_plus.py )
-Provides methods for interacting with the player's inventory and screens.
+Provides methods for interacting with the player's inventory and other containers screens. \
+<u>Slot IDs</u>: \
+_Player inventory_: hotbar = 0-8, main = 9-35, offhand = 40, boots, leggins, chestplate, helmet = 36-39 \
+_Single chest_ / _Trap chest_ / _Ender chest_ / _Shulker box_: 0-26 \
+_Double chest_: 0-53 \
+If you need to access the player's main inventory or hotbar with an open container, you must add the container's size to the slot IDs. For example, if you have an open double chest, its size is 54 slots, then the hotbar slots IDs will be from 0+54=54 to 8+54=62, and the main inventory will be from 9+54=63 to 35+54=89.
 
 - **click_slot(slot: int) -> bool**  
   Simulates a left mouse click on a specified inventory slot.  
@@ -49,8 +54,8 @@ Provides methods for interacting with the player's inventory and screens.
   Transfers items from specified slots to the player's inventory using quick move.  
   *Returns:* `True` if successful, `False` if no screen is open.
 
-- **find_item(item_id: str, cust_name: str = "") -> int | None**  
-  Finds the first inventory slot containing a specified item, optionally matching a custom name.  
+- **find_item(item_id: str, cust_name: str = "", container: bool=False, try_open: bool=False) -> int | None**  
+  Finds the first inventory slot containing a specific item, optionally by matching a custom name, and optionally by searching an already opened container, or attempting to open a targeted one.  
   *Returns:* Slot ID or `None` if not found.
 
 **Example:**
@@ -126,6 +131,12 @@ Methods for simulating key presses.
 ### [`Client`](Minescript-Plus/minescript_plus.py )
 Methods for client-level actions.
 
+- **pause_game() -> bool**  
+  Open game menu.
+
+- **is_local_server() -> bool**  
+  Determines if the server is running locally (is single player).
+
 - **disconnect() -> None**  
   Disconnects the current Minecraft network connection with a custom message.
 
@@ -148,6 +159,12 @@ Methods for retrieving player information.
 
 - **get_skin_url() -> str**  
   Retrieves the URL of the player's skin texture.
+
+- **get_food_level() -> float**  
+  Retrieves the player's food level.
+
+- **get_saturation_level() -> float**  
+  Retrieves the player's saturation level.
 
 ---
 
@@ -203,6 +220,14 @@ Utility methods.
 ---
 
 ## Events
+
+There are a few events for now:
+| Event Name  | Fires when  | Returns |
+|:----------- |:----------- |:------- |
+| on_title        | Title text change | New title text
+| on_subtitle     | Subtitle text change | New subtitle text
+| on_actionbar    | Actionbar text change | New actionbar text
+| on_open_screen  | Any screen is opened  | The name of the screen  |
 
 ### [`Event`](Minescript-Plus/minescript_plus.py)
 Provides an event system for registering and handling custom or built-in Minescript Plus events.
