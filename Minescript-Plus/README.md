@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.6-alpha  
+**Version:** 0.7-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-07-12
+**Date:** 2025-07-15
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod, using [`lib_java`](https://minescript.net/sdm_downloads/lib_java-v2/) and other libraries.  
 This module should be imported by other scripts and not run directly.
