@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.7-alpha  
+**Version:** 0.8-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-07-15
+**Date:** 2025-07-16
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod, using [`lib_java`](https://minescript.net/sdm_downloads/lib_java-v2/) and other libraries.  
 This module should be imported by other scripts and not run directly.
@@ -32,7 +32,7 @@ Provides methods for interacting with the player's inventory and other container
 _Player inventory_: hotbar = 0-8, main = 9-35, offhand = 40, boots, leggins, chestplate, helmet = 36-39 \
 _Single chest_ / _Trap chest_ / _Ender chest_ / _Shulker box_: 0-26 \
 _Double chest_: 0-53 \
-If you need to access the player's main inventory or hotbar with an open container, you must add the container's size to the slot IDs. For example, if you have an open double chest, its size is 54 slots, then the hotbar slots IDs will be from 0+54=54 to 8+54=62, and the main inventory will be from 9+54=63 to 35+54=89.
+If you need to access the player's main inventory or hotbar with an open container, the slot IDs change. For example, if you have an open double chest (54 slots), then the main inventory will be from 54 to 80, and the hotbar slots IDs will be from 81 to 89. Refer to [this page](https://minecraft.wiki/w/Java_Edition_protocol/Inventory#Chest) for more information.
 
 - **click_slot(slot: int) -> bool**  
   Simulates a left mouse click on a specified inventory slot.  

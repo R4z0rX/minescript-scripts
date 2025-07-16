@@ -1,7 +1,7 @@
 """
     @author RazrCraft
     @create date 2025-07-07 21:38:07
-    @modify date 2025-07-13 13:16:50
+    @modify date 2025-07-16 19:40:13
     @desc Simple actionbar event example using Event.register method
  """
 import asyncio
@@ -18,7 +18,9 @@ def on_actionbar(text: str):
 
 async def main():
     listener = await Event.register("on_actionbar", on_actionbar)
-    print(f"{listener = }")
+    print("Actionbar event test")
+    print("You can use this command to testi it: /title @s actionbar \"Test!\"")
+    print("Waiting for actionbar...")
 
     with tick_loop:
         while loop:

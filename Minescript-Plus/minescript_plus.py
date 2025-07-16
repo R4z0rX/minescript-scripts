@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.7-alpha
+    Version: 0.8-alpha
     Author: RazrCraft
-    Date: 2025-07-15
+    Date: 2025-07-16
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -16,169 +16,168 @@
 import asyncio
 from time import sleep
 from typing import Callable, Literal
-from minescript import (script_loop, render_loop, ItemStack, TargetedBlock, version_info, player_inventory,
+from minescript import (set_default_executor, script_loop, render_loop, ItemStack, TargetedBlock, version_info, player_inventory,
                         player_get_targeted_block, press_key_bind, screen_name, player_name, job_info,
                         container_get_items)
 from lib_java import JavaClass, java_class_map, java_member_map
 import lib_nbt
 
-with script_loop:
-    EventMode = Literal["flag", "callback"]
-    EventName = Literal["on_title", "on_subtitle", "on_actionbar"]
-    _events = {}
+set_default_executor(script_loop)
+EventMode = Literal["flag", "callback"]
+EventName = Literal["on_title", "on_subtitle", "on_actionbar"]
+_events = {}
 
-    class EventDefinition:
-        def __init__(self, name: str, mode: EventMode, flag: bool = False, condition: Callable | None = None, interval: float | None = None):
-            self.name: str = name
-            self.mode: EventMode = mode  # "flag" or "callback"
-            self.flag: bool = flag
-            self.condition: Callable = condition
-            self.interval = interval
+class EventDefinition:
+    def __init__(self, name: str, mode: EventMode, flag: bool = False, condition: Callable | None = None, interval: float | None = None):
+        self.name: str = name
+        self.mode: EventMode = mode  # "flag" or "callback"
+        self.flag: bool = flag
+        self.condition: Callable = condition
+        self.interval = interval
 
-        def get_condition(self):
-            if self.mode == "flag":
-                return lambda: (self.flag, (), {})  # type: ignore
-            elif self.mode == "callback":
-                return self.condition
-            else:
-                raise ValueError(f"Invalid mode for event '{self.name}'.")
+    def get_condition(self):
+        if self.mode == "flag":
+            return lambda: (self.flag, (), {})  # type: ignore
+        elif self.mode == "callback":
+            return self.condition
+        else:
+            raise ValueError(f"Invalid mode for event '{self.name}'.")
 
-    class Listener:
-        def __init__(
-            self,
-            event_name: str,
-            callback: Callable,
-            condition_function: Callable,
-            once: bool,
-            manager,
-            check_interval: float = 0.5,
-        ):
-            self.event_name: str = event_name
-            self.callback: Callable = callback
-            self.condition_function: Callable = condition_function
-            self.once: bool = once
-            self.manager = manager
-            self.check_interval: float = check_interval
-            self._running: bool = True
-            self._task: asyncio.Task = None
+class Listener:
+    def __init__(
+        self,
+        event_name: str,
+        callback: Callable,
+        condition_function: Callable,
+        once: bool,
+        manager,
+        check_interval: float = 0.5,
+    ):
+        self.event_name: str = event_name
+        self.callback: Callable = callback
+        self.condition_function: Callable = condition_function
+        self.once: bool = once
+        self.manager = manager
+        self.check_interval: float = check_interval
+        self._running: bool = True
+        self._task: asyncio.Task = None
 
-        def start(self):
-            self._task = asyncio.create_task(self.__run_loop())
+    def start(self):
+        self._task = asyncio.create_task(self.__run_loop())
 
-        async def __run_loop(self):
-            while self._running:
-                triggered, args, kwargs = self.condition_function()
-                if triggered:
-                    self.callback(*args, **kwargs)
-                    if self.once:
-                        self.unregister()
-                await asyncio.sleep(self.check_interval)
+    async def __run_loop(self):
+        while self._running:
+            triggered, args, kwargs = self.condition_function()
+            if triggered:
+                self.callback(*args, **kwargs)
+                if self.once:
+                    self.unregister()
+            await asyncio.sleep(self.check_interval)
 
-        def unregister(self):
-            self._running = False
-            self.manager._unregister(self)  # pylint: disable=W0212
+    def unregister(self):
+        self._running = False
+        self.manager._unregister(self)  # pylint: disable=W0212
 
-    class Event:
-        _listeners = []
-        _callbacks = {}
+class Event:
+    _listeners = []
+    _callbacks = {}
 
-        @classmethod
-        async def register(cls,
-                           event_name: EventName | str,
-                           callback: Callable[[], None],
-                           once: bool = False,
-                           check_interval: float = 0.05,
-                           ) -> Listener:
-            event_def = _events[event_name]
-            condition = event_def.get_condition()
-            event_interval = event_def.interval
+    @classmethod
+    async def register(cls,
+                        event_name: EventName | str,
+                        callback: Callable[[], None],
+                        once: bool = False,
+                        check_interval: float = 0.05,
+                        ) -> Listener:
+        event_def = _events[event_name]
+        condition = event_def.get_condition()
+        event_interval = event_def.interval
 
-            listener = Listener(
-                event_name=event_name,
-                callback=callback,
-                condition_function=condition,
-                once=once,
-                manager=cls,
-                check_interval=event_interval or check_interval
-            )
-            cls._listeners.append(listener)
-            listener.start()
-            return listener
+        listener = Listener(
+            event_name=event_name,
+            callback=callback,
+            condition_function=condition,
+            once=once,
+            manager=cls,
+            check_interval=event_interval or check_interval
+        )
+        cls._listeners.append(listener)
+        listener.start()
+        return listener
 
-        @classmethod
-        def unregister(cls, listener: Listener):
-            listener.unregister()
+    @classmethod
+    def unregister(cls, listener: Listener):
+        listener.unregister()
 
-        @classmethod
-        def _unregister(cls, listener: Listener):
-            if listener in cls._listeners:
-                cls._listeners.remove(listener)
+    @classmethod
+    def _unregister(cls, listener: Listener):
+        if listener in cls._listeners:
+            cls._listeners.remove(listener)
 
-        @classmethod
-        def define_event(cls, event: EventDefinition):
-            _events[event.name] = event
+    @classmethod
+    def define_event(cls, event: EventDefinition):
+        _events[event.name] = event
 
-        @classmethod
-        def define_flag_event(cls, name: str):
-            cls.define_event(EventDefinition(name, mode="flag"))
+    @classmethod
+    def define_flag_event(cls, name: str):
+        cls.define_event(EventDefinition(name, mode="flag"))
 
-        @classmethod
-        def define_callback_event(cls, name: str, condition: Callable):
-            cls.define_event(EventDefinition(
-                name, mode="callback", condition=condition))
+    @classmethod
+    def define_callback_event(cls, name: str, condition: Callable):
+        cls.define_event(EventDefinition(
+            name, mode="callback", condition=condition))
 
-        @classmethod
-        def event(cls, func: Callable) -> Callable:
-            name = func.__name__
-            cls._callbacks[name] = func
-            return func
+    @classmethod
+    def event(cls, func: Callable) -> Callable:
+        name = func.__name__
+        cls._callbacks[name] = func
+        return func
 
-        @classmethod
-        async def activate_all(cls):
-            for name, func in cls._callbacks.items():
-                await cls.register(name, func)
-                
-        @staticmethod
-        def set_trigger(event_name: EventName | str, value: bool):
-            event = _events.get(event_name)
-            if not event or event.mode != "flag":
-                raise ValueError(f"Event '{event_name}' is not of type flag.")
-            event.flag = value
+    @classmethod
+    async def activate_all(cls):
+        for name, func in cls._callbacks.items():
+            await cls.register(name, func)
+            
+    @staticmethod
+    def set_trigger(event_name: EventName | str, value: bool):
+        event = _events.get(event_name)
+        if not event or event.mode != "flag":
+            raise ValueError(f"Event '{event_name}' is not of type flag.")
+        event.flag = value
 
 
-    def __title_event_callback():
-        r = Gui.get_title()
-        if r is not None:
-            return True, (r,), {}
-        return False, (), {}
+def __title_event_callback():
+    r = Gui.get_title()
+    if r is not None:
+        return True, (r,), {}
+    return False, (), {}
 
-    def __subtitle_event_callback():
-        r = Gui.get_subtitle()
-        if r is not None:
-            return True, (r,), {}
-        return False, (), {}
+def __subtitle_event_callback():
+    r = Gui.get_subtitle()
+    if r is not None:
+        return True, (r,), {}
+    return False, (), {}
 
-    def __actionbar_event_callback():
-        r = Gui.get_actionbar()
-        if r is not None:
-            return True, (r,), {}
-        return False, (), {}
-    
-    def __open_screen_event_callback():
-        r = screen_name()
-        if r is not None:
-            return True, (r,), {}
-        return False, (), {}
+def __actionbar_event_callback():
+    r = Gui.get_actionbar()
+    if r is not None:
+        return True, (r,), {}
+    return False, (), {}
 
-with script_loop:
-    Event.define_event(EventDefinition(
-        "on_title", mode="callback", condition=__title_event_callback))
-    Event.define_event(EventDefinition(
-        "on_subtitle", mode="callback", condition=__subtitle_event_callback))
-    Event.define_event(EventDefinition(
-        "on_actionbar", mode="callback", condition=__actionbar_event_callback))
-    Event.define_event(EventDefinition(
-        "on_open_screen", mode="callback", condition=__open_screen_event_callback, interval=0.05))
+def __open_screen_event_callback():
+    r = screen_name()
+    if r is not None:
+        return True, (r,), {}
+    return False, (), {}
+
+Event.define_event(EventDefinition(
+    "on_title", mode="callback", condition=__title_event_callback))
+Event.define_event(EventDefinition(
+    "on_subtitle", mode="callback", condition=__subtitle_event_callback))
+Event.define_event(EventDefinition(
+    "on_actionbar", mode="callback", condition=__actionbar_event_callback))
+Event.define_event(EventDefinition(
+    "on_open_screen", mode="callback", condition=__open_screen_event_callback, interval=0.05))
 
 # Mojang -> Intermediary mappings
 mc_class_name = version_info().minecraft_class_name
@@ -488,8 +487,8 @@ class Screen:
 
 # # # GUI # # #
 
-class Gui:
-    with render_loop:
+with render_loop:
+    class Gui:
         @staticmethod
         def get_title() -> str | None:
             """
@@ -618,6 +617,7 @@ class Gui:
                 None
             """
             mc.gui.clearTitles()
+    # End render_loop
 
 # # # KEY # # #
 
