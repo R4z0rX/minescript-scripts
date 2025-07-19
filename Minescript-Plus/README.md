@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.8-alpha  
+**Version:** 0.9-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-07-16
+**Date:** 2025-07-19
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod, using [`lib_java`](https://minescript.net/sdm_downloads/lib_java-v2/) and other libraries.  
 This module should be imported by other scripts and not run directly.
@@ -34,8 +34,8 @@ _Single chest_ / _Trap chest_ / _Ender chest_ / _Shulker box_: 0-26 \
 _Double chest_: 0-53 \
 If you need to access the player's main inventory or hotbar with an open container, the slot IDs change. For example, if you have an open double chest (54 slots), then the main inventory will be from 54 to 80, and the hotbar slots IDs will be from 81 to 89. Refer to [this page](https://minecraft.wiki/w/Java_Edition_protocol/Inventory#Chest) for more information.
 
-- **click_slot(slot: int) -> bool**  
-  Simulates a left mouse click on a specified inventory slot.  
+- **click_slot(slot: int, right_button: bool=False) -> bool**  
+  Simulates a left (or right) mouse click on a specified inventory slot.  
   *Returns:* `True` if successful, `False` if no screen is open.
 
 - **shift_click_slot(slot: int) -> bool**  
@@ -56,7 +56,8 @@ If you need to access the player's main inventory or hotbar with an open contain
 
 - **find_item(item_id: str, cust_name: str = "", container: bool=False, try_open: bool=False) -> int | None**  
   Finds the first inventory slot containing a specific item, optionally by matching a custom name, and optionally by searching an already opened container, or attempting to open a targeted one.  
-  *Returns:* Slot ID or `None` if not found.
+  *Returns:* Slot ID or `None` if not found. \
+  <u>Note</u>: This feature use [**lib_nbt**](https://minescript.net/sdm_downloads/lib_nbt-v1/).
 
 **Example:**
 ```python
@@ -65,6 +66,10 @@ slot = Inventory.find_item("minecraft:diamond")
 if slot is not None:
     Inventory.click_slot(slot)
 ```
+
+- **count_total(inventory: list[ItemStack], item_id: int) -> int**  
+  Counts the total number of items with a specific item ID in the given inventory.  
+  *Returns:* The total count of items with the specified item ID.
 
 ---
 
@@ -209,6 +214,10 @@ Methods for retrieving world information.
 - **get_day_time() -> int**  
   Returns the current day time in ticks.
 
+- **get_targeted_sign_text() -> list[str]**  
+  Retrieves the text from both the front and back sides of the sign block currently targeted by the player.  
+  *Returns:* A list containing the text lines from the targeted sign (first four elements are the front, next four are the back).
+
 ---
 
 ### [`Util`](Minescript-Plus/minescript_plus.py )
@@ -216,6 +225,12 @@ Utility methods.
 
 - **get_job_id(cmd: str) -> int | None**  
   Returns the job ID of a job matching the given command string, or `None` if not found.
+
+- **get_clipboard() -> str**  
+  Retrieves the current contents of the system clipboard.
+
+- **set_clipboard(string: str) -> int | None**  
+  Sets the system clipboard to the specified string.
 
 ---
 
@@ -268,6 +283,38 @@ def on_actionbar(text: str):
 
 # Later, in your main asyncio function:
 await Event.activate_all()
+```
+
+---
+
+## Keybind
+
+The `Keybind` class allows you to register, modify, and remove custom keybinds that trigger Python callbacks when specific keys are pressed in Minecraft. Key codes use [GLFW Keyboard key tokens](https://www.glfw.org/docs/3.4/group__keys.html).
+For simplicity, you can use [glfw_key_codes.py](https://github.com/R4z0rX/minescript-scripts/blob/main/lib/glfw_keycodes.py).
+ 
+### [`Keybind`](Minescript-Plus/minescript_plus.py)
+
+- **set_keybind(key: int, callback: Callable[[], None], name: str = "", category: str = "", description: str = "") -> None**  
+  Registers a new keybind for the given key code. The callback will be called when the key is pressed. Optional metadata (name, category, description) is for display/documentation purposes.
+
+- **modify_keybind(key: int, callback: Callable[[], None], name: str = "", category: str = "", description: str = "") -> None**  
+  Modifies an existing keybind for the given key code. Raises an error if the keybind does not exist.
+
+- **remove_keybind(key: int) -> None**  
+  Removes the keybind for the given key code. Raises an error if the keybind does not exist.
+
+**Example:**
+```python
+from minescript_plus import Keybind
+
+def on_f5():
+    print("F5 was pressed!")
+
+kb = Keybind()
+
+kb.set_keybind(294, on_f5)
+# or with glfw_key_codes.py (remember to import it)
+kb.set_keybind(GLFWKey.F5, on_f5)
 ```
 
 ---

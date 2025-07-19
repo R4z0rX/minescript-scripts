@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.8-alpha
+    Version: 0.9-alpha
     Author: RazrCraft
-    Date: 2025-07-16
+    Date: 2025-07-19
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -14,11 +14,12 @@
     official discord was used in this API, mostly in the Inventory class.
 """
 import asyncio
+import threading
 from time import sleep
 from typing import Callable, Literal
-from minescript import (set_default_executor, script_loop, render_loop, ItemStack, TargetedBlock, version_info, player_inventory,
-                        player_get_targeted_block, press_key_bind, screen_name, player_name, job_info,
-                        container_get_items)
+from minescript import (set_default_executor, EventQueue, EventType, script_loop, render_loop, ItemStack, TargetedBlock,
+                        version_info, log, player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name,
+                        job_info, container_get_items)
 from lib_java import JavaClass, java_class_map, java_member_map
 import lib_nbt
 
@@ -179,6 +180,62 @@ Event.define_event(EventDefinition(
 Event.define_event(EventDefinition(
     "on_open_screen", mode="callback", condition=__open_screen_event_callback, interval=0.05))
 
+
+class Keybind:
+    def __init__(self) -> None:
+        # Key map (int, GLFW code) -> (callback, name, category, description)
+        self.keybinds: dict[int, tuple[Callable[[], None], str, str, str]] = {}
+        self._listener_thread: threading.Thread = threading.Thread(
+            target=self._key_listener_loop,
+            daemon=True
+        )
+        self._listener_thread.start()
+
+    def set_keybind(
+        self,
+        key: int,
+        callback: Callable[[], None],
+        name: str = "",
+        category: str = "",
+        description: str = ""
+    ) -> None:
+        self.keybinds[key] = (callback, name, category, description)
+
+    def modify_keybind(
+        self,
+        key: int,
+        callback: Callable[[], None],
+        name: str = "",
+        category: str = "",
+        description: str = ""
+    ) -> None:
+        if key in self.keybinds:
+            self.keybinds[key] = (callback, name, category, description)
+        else:
+            raise ValueError(f"[Keybind] No existing keybind for {key} to modify.")
+
+    def remove_keybind(self, key: int) -> None:
+        if key in self.keybinds:
+            del self.keybinds[key]
+        else:
+            raise ValueError(f"[Keybind] No existing keybind for {key} to remove.")
+
+    def _key_listener_loop(self) -> None:
+        with EventQueue() as event_queue:
+            event_queue.register_key_listener()
+            while True:
+                event = event_queue.get()
+                if event.type == EventType.KEY:
+                    key: int = event.key
+
+                    if event.action == 0 and key in self.keybinds:
+                        callback, *_ = self.keybinds[key]
+                        try:
+                            callback()
+                        except Exception as e:
+                            log(f"[Keybind] Error in callback for key {key}: {e}")
+    
+
 # Mojang -> Intermediary mappings
 mc_class_name = version_info().minecraft_class_name
 if mc_class_name == "net.minecraft.class_310":
@@ -188,7 +245,8 @@ if mc_class_name == "net.minecraft.class_310":
         "net.minecraft.network.chat.Component": "net.minecraft.class_2561",         # net.minecraft.network.chat.Text
         "net.minecraft.client.KeyMapping": "net.minecraft.class_304",               # net.minecraft.client.option.KeyBinding
         "com.mojang.blaze3d.platform.InputConstants": "net.minecraft.class_3675",   # net.minecraft.client.util.InputUtil
-        "net.minecraft.world.Difficulty": "net.minecraft.class_1267"
+        "net.minecraft.world.Difficulty": "net.minecraft.class_1267",
+        "net.minecraft.core.BlockPos": "net.minecraft.class_2338"
     })
     java_member_map.update({
         "getInstance": "method_1551",
@@ -212,6 +270,7 @@ if mc_class_name == "net.minecraft.class_310":
         "getName": "method_8381",
         "isCreative": "method_8386",
         "isSurvival": "method_8388",
+        "level": "field_1687",
         "getLevel":"method_2890", # getWorld
         "getLevelData": "method_28104", # getLevelProperties
         "isRaining": "method_156",
@@ -225,6 +284,9 @@ if mc_class_name == "net.minecraft.class_310":
         "screen": "field_1755",
         "gui": "field_1705",
         "gameMode": "field_1761",
+        "keyboardHandler": "field_1774",
+        "getClipboard": "method_1460",
+        "setClipboard": "method_1455",
         "handleInventoryMouseClick": "method_2906",
         "getMenu": "method_17577",
         "containerId": "field_7763",
@@ -257,7 +319,10 @@ if mc_class_name == "net.minecraft.class_310":
         "getFoodLevel": "method_7586",
         "setFoodLevel": "method_7580",
         "getSaturationLevel": "method_7589",
-        "setSaturation": "method_7581"
+        "setSaturation": "method_7581",
+        "getBlockEntity": "method_8321",
+        "getText": "method_49843",
+        "getMessage": "method_49859"
     })
 
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
@@ -266,6 +331,7 @@ Component = JavaClass("net.minecraft.network.chat.Component")
 KeyMapping = JavaClass("net.minecraft.client.KeyMapping")
 InputConstants = JavaClass("com.mojang.blaze3d.platform.InputConstants")
 Difficulty = JavaClass("net.minecraft.world.Difficulty")
+BlockPos = JavaClass("net.minecraft.core.BlockPos")
 
 mc = Minecraft.getInstance()
 
@@ -285,11 +351,12 @@ THROW           Throws the item out of the inventory.
 
 class Inventory:
     @staticmethod
-    def click_slot(slot: int) -> bool:
+    def click_slot(slot: int, right_button: bool=False) -> bool:
         """
         Simulates a left mouse click on a specified inventory slot in the current screen.
         Args:
             slot (int): The index of the inventory slot to click (0-40).
+            right_button (bool, optional): If True, simulates right click. Default: False
         Returns:
             bool: True if the click was performed successfully, False if no screen is open.
         """
@@ -298,7 +365,7 @@ class Inventory:
             return False
 
         container_menu = screen.getMenu()
-        mouse_button = 0
+        mouse_button = 1 if right_button else 0
         # handleInventoryMouseClick(int syncId, int slotId, int button, ClickType arg3, Player arg4)
         mc.gameMode.handleInventoryMouseClick(
             container_menu.containerId, slot, mouse_button, ClickType.PICKUP, mc.player)
@@ -444,50 +511,63 @@ class Inventory:
 
         return None
 
-# # # SCREEN # # #
-
-class Screen:
     @staticmethod
-    def wait_screen(name: str = "", delay: int = 500) -> bool:
+    def count_total(inventory: list[ItemStack], item_id: int) -> int:
         """
-        Waits for a screen with a specific name (or any screen if name is empty) to become available within a short period.
+        Counts the total number of items with a specific item ID in the given inventory.
 
         Args:
-            name (str, optional): The name of the screen to wait for. If empty, waits for any screen. Defaults to "".
-            delay (int, optional): The maximum time to wait for the screen name in milliseconds. Defaults to 500.
+            inventory (list[ItemStack]): A list of ItemStack objects representing the inventory.
+            item_id (int): The ID of the item to count.
 
         Returns:
-            bool: True if the specified screen name (or any screen if name is empty) is detected 
-            within the wait period, False otherwise.
+            int: The total count of items with the specified item ID in the inventory.
         """
-        w = 0.05
-        i: int = int(delay * w) or 1
-        for _ in range(i):
-            scn_name = screen_name()
-            if scn_name is not None:
-                if name == "":
-                    return True
-                elif scn_name == name:
-                    return True
-            sleep(w)
+        return sum(stack.count for stack in inventory if stack.item == item_id)
 
-        return False
+# # # SCREEN # # #
+with render_loop:
+    class Screen:
+        @staticmethod
+        def wait_screen(name: str = "", delay: int = 500) -> bool:
+            """
+            Waits for a screen with a specific name (or any screen if name is empty) to become available within a short period.
 
-    @staticmethod
-    def close_screen() -> None:
-        """
-        Closes the currently open chest GUI in Minecraft by simulating an Escape key press.
-        Returns:
-            None
-        """
-        screen = mc.screen
-        if screen is not None:
-            # keyPressed(int keyCode, int scanCode, int modifiers)
-            screen.keyPressed(256, 0, 0)  # 256 is key code for escape key.
+            Args:
+                name (str, optional): The name of the screen to wait for. If empty, waits for any screen. Defaults to "".
+                delay (int, optional): The maximum time to wait for the screen name in milliseconds. Defaults to 500.
+
+            Returns:
+                bool: True if the specified screen name (or any screen if name is empty) is detected 
+                within the wait period, False otherwise.
+            """
+            w = 0.05
+            i: int = int(delay * w) or 1
+            for _ in range(i):
+                scn_name = screen_name()
+                if scn_name is not None:
+                    if name == "":
+                        return True
+                    elif scn_name == name:
+                        return True
+                sleep(w)
+
+            return False
+
+        @staticmethod
+        def close_screen() -> None:
+            """
+            Closes the currently open chest GUI in Minecraft by simulating an Escape key press.
+            Returns:
+                None
+            """
+            screen = mc.screen
+            if screen is not None:
+                # keyPressed(int keyCode, int scanCode, int modifiers)
+                screen.keyPressed(256, 0, 0)  # 256 is key code for escape key.
 
 # # # GUI # # #
 
-with render_loop:
     class Gui:
         @staticmethod
         def get_title() -> str | None:
@@ -876,6 +956,29 @@ class World:
         Returns the current day time in ticks.
         """
         return World.__get_level_data().getDayTime() # type: ignore
+   
+    @staticmethod
+    def get_targeted_sign_text() -> list[str]:
+        """
+        Retrieves the text from both the front and back sides of the sign block currently targeted by the player.
+        
+        Returns:
+            list[str]: A list containing the text lines from the targeted sign. The first four elements are the lines from the front side, and the next four are from the back side.
+        """
+        position = player_get_targeted_block().position
+        pos = BlockPos(*position)
+
+        sign = mc.level.getBlockEntity(pos)
+        sign_text = []
+        
+        # Front
+        for i in range(0, 4):
+            sign_text.append(sign.getText(True).getMessage(i, True).tryCollapseToString())
+        # Back
+        for i in range(0, 4):
+            sign_text.append(sign.getText(False).getMessage(i, True).tryCollapseToString())
+        
+        return sign_text
 
 # # # UTIL # # #
 
@@ -890,3 +993,23 @@ class Util:
             int | None: The job_id of the matching job, or None if not found.
         """
         return ([job.job_id for job in job_info() if job.command == [cmd]] or [None])[0]
+
+    @staticmethod
+    def get_clipboard() -> str:
+        """
+        Retrieves the current contents of the system clipboard.
+
+        Returns:
+            str: The text currently stored in the clipboard.
+        """
+        return mc.keyboardHandler.getClipboard() # type: ignore
+
+    @staticmethod
+    def set_clipboard(string: str):
+        """
+        Sets the system clipboard to the specified string.
+
+        Args:
+            string (str): The text to be copied to the clipboard.
+        """
+        mc.keyboardHandler.setClipboard(string)
