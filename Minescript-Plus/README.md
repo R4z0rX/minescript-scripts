@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.9-alpha  
+**Version:** 0.10-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-07-19
+**Date:** 2025-08-03
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod, using [`lib_java`](https://minescript.net/sdm_downloads/lib_java-v2/) and other libraries.  
 This module should be imported by other scripts and not run directly.
@@ -145,6 +145,19 @@ Methods for client-level actions.
 - **disconnect() -> None**  
   Disconnects the current Minecraft network connection with a custom message.
 
+- **get_options()**  
+  Returns an instance of the game options.  
+  Use `Client.get_options().<option_name>().value` to get an option value.  
+  Example: print("FOV:", Client.get_options().fov().value)
+
+**Example:**
+```python
+from minescript_plus import Client
+options = Client.get_options()
+print("FOV:", options.fov().value)
+print("Gamma:", options.gamma().value)
+```
+
 ---
 
 ### [`Player`](Minescript-Plus/minescript_plus.py )
@@ -187,6 +200,18 @@ Methods for retrieving server information.
 
 - **is_realm() -> bool | None**  
   Determines if the current server is a Realm.
+
+- **get_tablist() -> list[dict[str,Any]]**  
+  Retrieves a list of dictionaries containing information about all online players in the tab list.  
+  Each dictionary contains keys: "Name", "UUID", "Latency", "GameMode", "SkinURL", "TablistOrder", and optionally "Team".
+
+**Example:**
+```python
+from minescript_plus import Server
+tablist = Server.get_tablist()
+for player in tablist:
+    print(player["Name"], player["Latency"])
+```
 
 ---
 

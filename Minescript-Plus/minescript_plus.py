@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.9-alpha
+    Version: 0.10-alpha
     Author: RazrCraft
-    Date: 2025-07-19
+    Date: 2025-08-03
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -16,7 +16,7 @@
 import asyncio
 import threading
 from time import sleep
-from typing import Callable, Literal
+from typing import Callable, Literal, Any
 from minescript import (set_default_executor, EventQueue, EventType, script_loop, render_loop, ItemStack, TargetedBlock,
                         version_info, log, player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name,
                         job_info, container_get_items)
@@ -24,6 +24,9 @@ from lib_java import JavaClass, java_class_map, java_member_map
 import lib_nbt
 
 set_default_executor(script_loop)
+
+_ver: str = "0.10-alpha"
+
 EventMode = Literal["flag", "callback"]
 EventName = Literal["on_title", "on_subtitle", "on_actionbar"]
 _events = {}
@@ -237,8 +240,10 @@ class Keybind:
     
 
 # Mojang -> Intermediary mappings
+fabric = False
 mc_class_name = version_info().minecraft_class_name
 if mc_class_name == "net.minecraft.class_310":
+    fabric = True
     java_class_map.update({
         "net.minecraft.client.Minecraft": "net.minecraft.class_310",                # net.minecraft.client.MinecraftClient
         "net.minecraft.world.inventory.ClickType": "net.minecraft.class_1713",      # net.minecraft.screen.slot.SlotActionType
@@ -250,9 +255,9 @@ if mc_class_name == "net.minecraft.class_310":
     })
     java_member_map.update({
         "getInstance": "method_1551",
-        "getNetworkHandler": "method_1562",
         "getConnection": "method_48296",
         "disconnect": "method_10747",
+        "options": "field_1690",
         "name": "field_3752",
         "ip": "field_3761",
         "status": "field_3753",  # playerCountLabel
@@ -267,7 +272,14 @@ if mc_class_name == "net.minecraft.class_310":
         "isRealm": "method_52811",
         "getLatency": "method_2959",
         "getGameMode": "method_2958",
-        "getName": "method_8381",
+        "getProfile": "method_2966",
+        #"getName": "method_8381",
+        "getName": "getName",
+        "getTabListDisplayName": "method_2971",
+        "getTabListOrder": "method_62154",
+        "getTeam": "method_2955",
+        "getDisplayName": "method_1140",
+        "getColor": "method_1202",
         "isCreative": "method_8386",
         "isSurvival": "method_8388",
         "level": "field_1687",
@@ -281,6 +293,7 @@ if mc_class_name == "net.minecraft.class_310":
         "getGameTime": "method_188", # getTime
         "getDayTime": "method_217", # getTimeOfDay
         "player": "field_1724",
+        "connection": "field_3944",
         "screen": "field_1755",
         "gui": "field_1705",
         "gameMode": "field_1761",
@@ -335,6 +348,8 @@ BlockPos = JavaClass("net.minecraft.core.BlockPos")
 
 mc = Minecraft.getInstance()
 
+mc.gui.setOverlayMessage(None, False)
+
 """
 ClickType
 Enum Constant   Description
@@ -346,6 +361,21 @@ QUICK_MOVE      Performs a shift-click.
 SWAP            Exchanges items between a slot and a hotbar slot.
 THROW           Throws the item out of the inventory.
 """
+
+def _get_private_field(clazz, field_name, super_class: bool=False): # type: ignore
+    if super_class:
+        c = clazz.getClass().getSupercLass()
+    else:
+        c = clazz.getClass()
+    f = java_member_map.get(field_name)
+    field = c.getDeclaredField(f)
+    field.setAccessible(True)
+    return field.get(clazz)
+
+def _get_game_mode_name(c):
+    if fabric:
+        return c.method_8381()
+    return c.getName()
 
 # # # INVENTORY # # #
 
@@ -577,15 +607,11 @@ with render_loop:
             Returns:
                 str or None: The title, or None if not available.
             """
-            c = mc.gui.getClass()
-            f = java_member_map.get("title")
-            field = c.getDeclaredField(f)
-            field.setAccessible(True)
-            title = field.get(mc.gui)
-            if title is not None:
-                # title = title.getString()
-                title = title.tryCollapseToString()
-            return title  # type: ignore
+            subtitle = _get_private_field(mc.gui, "subtitle")
+            if subtitle is not None:
+                # subtitle = subtitle.getString()
+                subtitle = subtitle.tryCollapseToString()
+            return subtitle  # type: ignore
 
         @staticmethod
         def get_subtitle() -> str | None:
@@ -595,15 +621,12 @@ with render_loop:
             Returns:
                 str or None: The subtitle, or None if not available.
             """
-            c = mc.gui.getClass()
-            f = java_member_map.get("subtitle")
-            field = c.getDeclaredField(f)
-            field.setAccessible(True)
-            subtitle = field.get(mc.gui)
-            if subtitle is not None:
-                # subtitle = subtitle.getString()
-                subtitle = subtitle.tryCollapseToString()
-            return subtitle  # type: ignore
+            overlayMessageString = _get_private_field(mc.gui, "overlayMessageString")
+            if overlayMessageString is not None:
+                # overlayMessageString = overlayMessageString.getString()
+                overlayMessageString = overlayMessageString.tryCollapseToString()
+                mc.gui.setOverlayMessage(None, False)
+            return overlayMessageString  # type: ignore
 
         @staticmethod
         def get_actionbar() -> str | None:
@@ -613,11 +636,7 @@ with render_loop:
             Returns:
                 str or None: The current overlay message string if present, otherwise None.
             """
-            c = mc.gui.getClass()
-            f = java_member_map.get("overlayMessageString")
-            field = c.getDeclaredField(f)
-            field.setAccessible(True)
-            overlayMessageString = field.get(mc.gui)
+            overlayMessageString = _get_private_field(mc.gui, "overlayMessageString")
             if overlayMessageString is not None:
                 # overlayMessageString = overlayMessageString.getString()
                 overlayMessageString = overlayMessageString.tryCollapseToString()
@@ -758,15 +777,26 @@ class Client:
         This function calls the network handler's disconnect method, passing a literal text message
         to indicate that the disconnection was initiated by the user.
         """
-        mc.getNetworkHandler().getConnection().disconnect(
+        mc.player.connection.getConnection().disconnect(
             Component.literal("Disconnected by user"))
+
+    @staticmethod
+    def get_options():
+        """
+        Returns an instance of the game options
+        
+        Use `Client.get_options().<option_name>().value` to get an option value.
+        Example: print("FOV:", Client.get_options().fov().value)
+                 print("Gamma:", Client.get_options().gamma().value)
+        """
+        return mc.options
 
 # # # PLAYER # # #
 
 class Player:
     @staticmethod
     def __get_player_info(name: str):
-        return mc.getNetworkHandler().getPlayerInfo(name)
+        return mc.player.connection.getPlayerInfo(name)
 
     @staticmethod
     def get_latency() -> int:
@@ -782,7 +812,7 @@ class Player:
             str: The game mode of the player as a string.
         """
         name = player_name()
-        return Player.__get_player_info(name).getGameMode().getName()
+        return _get_game_mode_name(Player.__get_player_info(name).getGameMode())
 
     @staticmethod
     def is_creative() -> bool:
@@ -832,7 +862,7 @@ class Player:
 class Server:
     @staticmethod
     def __get_server_data():
-        return mc.getNetworkHandler().getServerData()
+        return mc.player.connection.getServerData()
 
     @staticmethod
     def is_local() -> bool:
@@ -885,13 +915,56 @@ class Server:
         if server_data is not None:
             return server_data.isRealm() # type: ignore
         return None
+    
+    @staticmethod
+    def get_tablist() -> list[dict[str,Any]]:
+        """
+        Retrieves a list of dictionaries containing information about all online players in the tab list.
+        Returns:
+            list[dict[str, Any]]: A list where each dictionary represents a player and contains the following keys:
+                - "Name" (str): The display name of the player in the tab list, or their profile name if not set.
+                - "UUID" (Any): The unique identifier of the player.
+                - "Latency" (Any): The player's network latency.
+                - "GameMode" (str): The name of the player's current game mode.
+                - "SkinURL" (str): The URL to the player's skin texture.
+                - "TablistOrder" (Any): The player's order in the tab list.
+                - "Team" (dict, optional): If the player is on a team, a dictionary with:
+                    - "TeamName" (str): The display name of the team.
+                    - "Color" (Any): The team's color.
+        """
+        op = []
+        opi = {}
+        opt = {}
+        pi_list = mc.player.connection.getListedOnlinePlayers().toArray()
+        for i in range(len(pi_list)):
+            name = pi_list[i].getTabListDisplayName()
+            if name is None or name == "":
+                name = pi_list[i].getProfile().getName()
+            opi.update({
+                "Name": name,
+                "UUID": pi_list[i].getProfile().getId(),
+                "Latency": pi_list[i].getLatency(),
+                "GameMode": _get_game_mode_name(pi_list[i].getGameMode()),
+                "SkinURL": pi_list[i].getSkin().textureUrl(),
+                "TablistOrder": pi_list[i].getTabListOrder()
+                })
+            team = pi_list[i].getTeam()
+            if team:
+                opt.update({
+                    "TeamName": team.getDisplayName(),
+                    "Color": team.getColor()
+                    })
+                opi["Team"] = opt
+            op.append(opi)
+        
+        return op
 
 # # # WORLD # # #
 
 class World:
     @staticmethod
     def __get_level_data():
-        return mc.getNetworkHandler().getLevel().getLevelData()
+        return mc.player.connection.getLevel().getLevelData()
     
     @staticmethod
     def is_raining() -> bool:
