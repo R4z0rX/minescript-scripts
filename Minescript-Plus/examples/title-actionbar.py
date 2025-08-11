@@ -1,7 +1,7 @@
 """
     @author RazrCraft
     @create date 2025-06-25 01:55:12
-    @modify date 2025-07-13 13:14:43
+    @modify date 2025-08-11 18:19:40
     @desc Title, subtitle, and actionbar example
  """
 from time import sleep
@@ -11,8 +11,8 @@ print(f"{Gui.get_actionbar() = }")
 print(f"{Gui.get_title() = }")
 print(f"{Gui.get_subtitle() = }")
 Gui.set_actionbar("ACTIONBAR", False)
+sleep(2)
 print(f"{Gui.get_actionbar() = }")
-sleep(1)
 # setTimes(int fadeInTicks, int stayTicks, int fadeOutTicks)
 Gui.set_title_times(30, 20, 30)
 Gui.set_title("This is a Title")
@@ -22,8 +22,8 @@ print(f"{Gui.get_subtitle() = }")
 sleep(1)
 Gui.reset_title_times()
 Gui.set_actionbar("TINTED ACTIONBAR", True)
-print(f"{Gui.get_actionbar() = }")
 sleep(2)
+print(f"{Gui.get_actionbar() = }")
 Gui.set_title("Clear this Title")
 Gui.set_subtitle("Clear this Subtitle")
 sleep(.5)

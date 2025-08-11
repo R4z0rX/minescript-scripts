@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.10-alpha
+    Version: 0.11-alpha
     Author: RazrCraft
-    Date: 2025-08-03
+    Date: 2025-08-11
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -25,7 +25,7 @@ import lib_nbt
 
 set_default_executor(script_loop)
 
-_ver: str = "0.10-alpha"
+_ver: str = "0.11-alpha"
 
 EventMode = Literal["flag", "callback"]
 EventName = Literal["on_title", "on_subtitle", "on_actionbar"]
@@ -607,11 +607,10 @@ with render_loop:
             Returns:
                 str or None: The title, or None if not available.
             """
-            subtitle = _get_private_field(mc.gui, "subtitle")
-            if subtitle is not None:
-                # subtitle = subtitle.getString()
-                subtitle = subtitle.tryCollapseToString()
-            return subtitle  # type: ignore
+            title = _get_private_field(mc.gui, "title")
+            if title is not None:
+                title = title.tryCollapseToString()
+            return title  # type: ignore
 
         @staticmethod
         def get_subtitle() -> str | None:
@@ -621,12 +620,10 @@ with render_loop:
             Returns:
                 str or None: The subtitle, or None if not available.
             """
-            overlayMessageString = _get_private_field(mc.gui, "overlayMessageString")
-            if overlayMessageString is not None:
-                # overlayMessageString = overlayMessageString.getString()
-                overlayMessageString = overlayMessageString.tryCollapseToString()
-                mc.gui.setOverlayMessage(None, False)
-            return overlayMessageString  # type: ignore
+            subtitle = _get_private_field(mc.gui, "subtitle")
+            if subtitle is not None:
+                subtitle = subtitle.tryCollapseToString()
+            return subtitle  # type: ignore
 
         @staticmethod
         def get_actionbar() -> str | None:
@@ -638,7 +635,6 @@ with render_loop:
             """
             overlayMessageString = _get_private_field(mc.gui, "overlayMessageString")
             if overlayMessageString is not None:
-                # overlayMessageString = overlayMessageString.getString()
                 overlayMessageString = overlayMessageString.tryCollapseToString()
                 mc.gui.setOverlayMessage(None, False)
             return overlayMessageString  # type: ignore
