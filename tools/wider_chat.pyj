@@ -1,0 +1,59 @@
+"""
+    @author RazrCraft
+    @create date 2025-08-13 00:19:33
+    @modify date 2025-08-13 02:55:26
+    @desc A small utility to widen the chat
+ """
+from system.pyj.minescript import *
+
+Double = JavaClass("java.lang.Double")
+Minecraft = JavaClass("net.minecraft.client.Minecraft")
+
+mc = Minecraft.getInstance()
+
+
+def get_private_field(clazz, field_name: str):
+    c = clazz.getClass()
+    field = c.getDeclaredField(field_name)
+    field.setAccessible(True)
+    return field
+
+chat_width_field = get_private_field(mc.options, "field_1915")
+chat_width_field_class = chat_width_field.get(mc.options)
+value_field = get_private_field(chat_width_field_class, "field_37868")
+
+def get_width():
+    return value_field.get(chat_width_field_class)
+
+def set_width(v):
+    value_field.set(chat_width_field_class, Double(v))
+
+def isdigit(c):
+    o = ord(c)
+    if o > 47 and o < 58:
+        return True
+    return False
+
+def isnumeric(s):
+    if not s:
+        return False
+    for char in s:
+        if not isdigit(char):
+            return False
+    return True
+
+def set_chat_width(v):
+    print(f"Old Chat Width: {int(get_width() * 100)}%")
+    set_width(v / 100)
+    print(f"New Chat Width: {int(get_width() * 100)}%")
+    mc.gui.getChat().rescaleChat()
+
+if len(sys.argv) > 1:
+    v = sys.argv[1]
+    if isnumeric(v):
+        set_chat_width(int(v))
+    else:
+        print("Usage: \\wider_chat <percentage>")
+        print("Example: \\wider_chat 200")
+else:
+    set_chat_width(200)

@@ -20,7 +20,7 @@ def on_actionbar(text: str):
 async def main():
     await Event.activate_all()
     print("Actionbar event test")
-    print("You can use this command to testi it: /title @s actionbar \"Test!\"")
+    print("You can use this command to test it: /title @s actionbar \"Test!\"")
     print("Waiting for actionbar...")
     
     with tick_loop:

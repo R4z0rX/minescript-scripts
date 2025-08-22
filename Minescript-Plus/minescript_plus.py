@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.11-alpha
+    Version: 0.12-alpha
     Author: RazrCraft
-    Date: 2025-08-11
+    Date: 2025-08-21
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -15,21 +15,41 @@
 """
 import asyncio
 import threading
+from sys import exit, stderr # pylint: disable=W0622
 from time import sleep
 from typing import Callable, Literal, Any
-from minescript import (set_default_executor, EventQueue, EventType, script_loop, render_loop, ItemStack, TargetedBlock,
-                        version_info, log, player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name,
-                        job_info, container_get_items)
+from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock,
+                        player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name,
+                        job_info, container_get_items, player_position, entities)
+from minescript import version_info as ver_info
 from lib_java import JavaClass, java_class_map, java_member_map
 import lib_nbt
 
 set_default_executor(script_loop)
 
-_ver: str = "0.11-alpha"
+_ver: str = "0.12-alpha-dev"
+_intermediary_mc_ver = "1.21.8"
+
+if __name__ == "__main__":
+    print(f"Minescript Plus v{_ver} ({_intermediary_mc_ver})\n\nDon't run it, it's a module, you should import it in your scripts.")
+    exit(1)
+
+fabric = ver_info().minecraft_class_name == "net.minecraft.class_310"
+
+from dataclasses import dataclass, asdict
+from minescript import VersionInfo as VF
+
+@dataclass
+class VersionInfo(VF):
+    minescript_plus: str
+
+def version_info():    
+    print(VersionInfo(**asdict(ver_info()), minescript_plus=_ver), file=stderr)
 
 EventMode = Literal["flag", "callback"]
-EventName = Literal["on_title", "on_subtitle", "on_actionbar"]
+EventName = Literal["on_title", "on_subtitle", "on_actionbar", "on_open_screen"]
 _events = {}
+
 
 class EventDefinition:
     def __init__(self, name: str, mode: EventMode, flag: bool = False, condition: Callable | None = None, interval: float | None = None):
@@ -236,14 +256,11 @@ class Keybind:
                         try:
                             callback()
                         except Exception as e:
-                            log(f"[Keybind] Error in callback for key {key}: {e}")
+                            print(f"[Keybind] Error in callback for key {key}: {e}")
     
 
 # Mojang -> Intermediary mappings
-fabric = False
-mc_class_name = version_info().minecraft_class_name
-if mc_class_name == "net.minecraft.class_310":
-    fabric = True
+if fabric:
     java_class_map.update({
         "net.minecraft.client.Minecraft": "net.minecraft.class_310",                # net.minecraft.client.MinecraftClient
         "net.minecraft.world.inventory.ClickType": "net.minecraft.class_1713",      # net.minecraft.screen.slot.SlotActionType
@@ -268,6 +285,7 @@ if mc_class_name == "net.minecraft.class_310":
         "playerList": "field_3762",
         "pauseGame": "method_20539", # openGameMenu
         "isLocalServer": "method_1542", # isInSingleplayer
+        "isMultiplayerServer": "method_31321", # isConnectedToServer
         "isLan": "method_2994",
         "isRealm": "method_52811",
         "getLatency": "method_2959",
@@ -283,7 +301,7 @@ if mc_class_name == "net.minecraft.class_310":
         "isCreative": "method_8386",
         "isSurvival": "method_8388",
         "level": "field_1687",
-        "getLevel":"method_2890", # getWorld
+        "getLevel": "method_2890", # getWorld
         "getLevelData": "method_28104", # getLevelProperties
         "isRaining": "method_156",
         "isThundering": "method_203",
@@ -292,6 +310,7 @@ if mc_class_name == "net.minecraft.class_310":
         "getSpawnPos": "method_56126",
         "getGameTime": "method_188", # getTime
         "getDayTime": "method_217", # getTimeOfDay
+        "setScreen": "method_1507",
         "player": "field_1724",
         "connection": "field_3944",
         "screen": "field_1755",
@@ -325,7 +344,10 @@ if mc_class_name == "net.minecraft.class_310":
         "textureUrl": "comp_1911",
         "getServerData": "method_45734",        # getServerInfo() 
         "click": "method_1420",                 # onKeyPressed(InputUtil$Key key)
-        "set": "method_1416",                   # setKeyPressed(InputUtil$Key key, boolean pressed)
+        #"set": "method_1416",                   # setKeyPressed(InputUtil$Key key, boolean pressed)
+        "set": "method_41748",                  # setValue(T value)                                                 # OptionInstance
+        #"get": "method_41753",                  # getValue()                                                        # OptionInstance
+        "value": "field_37868",                 # value                                                             # OptionInstance
         "getKey": "method_15981",               # fromTranslationKey(String translationKey)
         "UNKNOWN": "field_16237",               # UNKNOWN_KEY
         "getFoodData": "method_7344",           # getHungerManager
@@ -335,7 +357,12 @@ if mc_class_name == "net.minecraft.class_310":
         "setSaturation": "method_7581",
         "getBlockEntity": "method_8321",
         "getText": "method_49843",
-        "getMessage": "method_49859"
+        "getMessage": "method_49859",
+        "send": "method_10743",
+        "getItem": "method_7909",
+        "getCount": "method_7947",
+        "mouseHandler": "field_1729",
+        "mouseGrabbed": "field_1783"
     })
 
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
@@ -364,7 +391,7 @@ THROW           Throws the item out of the inventory.
 
 def _get_private_field(clazz, field_name, super_class: bool=False): # type: ignore
     if super_class:
-        c = clazz.getClass().getSupercLass()
+        c = clazz.getClass().getSuperclass()
     else:
         c = clazz.getClass()
     f = java_member_map.get(field_name)
@@ -377,13 +404,29 @@ def _get_game_mode_name(c):
         return c.method_8381()
     return c.getName()
 
+def _get_item_name(c):
+    if fabric:
+        return c.method_63680().getString()
+    return c.getName().getString()
+
+def _set_grab_mouse():
+    clazz = mc.mouseHandler
+    field_name = "mouseGrabbed"
+    c = clazz.getClass()
+    f = java_member_map.get(field_name)
+    field = c.getDeclaredField(f)
+    field.setAccessible(True)
+    #print(field.get(clazz))
+    #field.set(clazz, True)
+    field.setBoolean(clazz, True)
+    
 # # # INVENTORY # # #
 
 class Inventory:
     @staticmethod
     def click_slot(slot: int, right_button: bool=False) -> bool:
         """
-        Simulates a left mouse click on a specified inventory slot in the current screen.
+        Simulates a left (or right) mouse click on a specified inventory slot in the current screen.
         Args:
             slot (int): The index of the inventory slot to click (0-40).
             right_button (bool, optional): If True, simulates right click. Default: False
@@ -556,6 +599,10 @@ class Inventory:
         return sum(stack.count for stack in inventory if stack.item == item_id)
 
 # # # SCREEN # # #
+
+java_class_map.update({
+    "net.minecraft.network.protocol.game.ServerboundContainerClosePacket": "net.minecraft.class_2815"
+})
 with render_loop:
     class Screen:
         @staticmethod
@@ -587,14 +634,16 @@ with render_loop:
         @staticmethod
         def close_screen() -> None:
             """
-            Closes the currently open chest GUI in Minecraft by simulating an Escape key press.
+            Closes the currently open chest GUI in Minecraft
+            
             Returns:
                 None
             """
             screen = mc.screen
             if screen is not None:
-                # keyPressed(int keyCode, int scanCode, int modifiers)
-                screen.keyPressed(256, 0, 0)  # 256 is key code for escape key.
+                mc.setScreen(None)
+                Client.send_packet("ServerboundContainerClosePacket", screen.getMenu().containerId)
+                _set_grab_mouse()
 
 # # # GUI # # #
 
@@ -728,7 +777,10 @@ class Key:
     def __press_keybind(keybind, state: bool):
         if state:
             KeyMapping.click(keybind)
-        KeyMapping.set(keybind, state)
+        if fabric:
+            KeyMapping.method_1416(keybind, state)
+        else:
+            KeyMapping.set(keybind, state)
 
     @staticmethod
     def press_key(key_name: str, state: bool):
@@ -764,7 +816,15 @@ class Client:
             bool: True if it's a local server, False otherwise.
         """
         return mc.isLocalServer() # type: ignore
-    
+
+    @staticmethod
+    def is_multiplayer_server() -> bool:
+        c = mc.getClass()
+        m = java_member_map.get("isMultiplayerServer")
+        method = c.getDeclaredMethod(m)
+        method.setAccessible(True)
+        return method.invoke(mc) # type: ignore
+
     @staticmethod
     def disconnect():
         """
@@ -782,10 +842,32 @@ class Client:
         Returns an instance of the game options
         
         Use `Client.get_options().<option_name>().value` to get an option value.
+        Use `Client.get_options().<option_name>().set(<value>)` to set an option value.
         Example: print("FOV:", Client.get_options().fov().value)
-                 print("Gamma:", Client.get_options().gamma().value)
+                 print("Gamma:", Client.get_options().gamma().get())
+                 Client.get_options().fov().set(90)
         """
         return mc.options
+    
+    @staticmethod
+    def send_packet(packet_class: str, *args, cat: str=""):
+        # packet_class <- Intermediary name
+        # Mojang: net.minecraft.network.protocol.game.<packet_class>
+        # List: https://mappings.dev/1.21.8/net/minecraft/network/protocol/game/index.html
+        # Yarn: net.minecraft.network.packet.c2s.play.<packet_class>
+        # List: https://maven.fabricmc.net/docs/yarn-1.21.8+build.1/net/minecraft/network/packet/c2s/play/package-summary.html
+        if packet_class.startswith("class"): # Intermediary
+            packet_class = "net.minecraft." + packet_class
+        elif "c2s" in packet_class:  # Yarn (Fabric)
+            if cat == "":
+                cat = "play"
+            packet_class = f"net.minecraft.network.packet.c2s.{cat}.{packet_class}"
+        else:   # Mojang
+            if cat == "":
+                cat = "game"
+            packet_class = f"net.minecraft.network.protocol.{cat}.{packet_class}"
+        p_class = JavaClass(packet_class)
+        mc.player.connection.getConnection().send(p_class(*args))
 
 # # # PLAYER # # #
 
@@ -936,23 +1018,25 @@ class Server:
             name = pi_list[i].getTabListDisplayName()
             if name is None or name == "":
                 name = pi_list[i].getProfile().getName()
+            else:
+                name = name.getString()
             opi.update({
                 "Name": name,
-                "UUID": pi_list[i].getProfile().getId(),
+                "UUID": pi_list[i].getProfile().getId().toString(),
                 "Latency": pi_list[i].getLatency(),
                 "GameMode": _get_game_mode_name(pi_list[i].getGameMode()),
                 "SkinURL": pi_list[i].getSkin().textureUrl(),
                 "TablistOrder": pi_list[i].getTabListOrder()
                 })
             team = pi_list[i].getTeam()
-            if team:
+            if team is not None:
                 opt.update({
-                    "TeamName": team.getDisplayName(),
-                    "Color": team.getColor()
+                    "TeamName": team.getDisplayName().getString(),
+                    "Color": team.getColor().method_537()
                     })
                 opi["Team"] = opt
             op.append(opi)
-        
+            
         return op
 
 # # # WORLD # # #
@@ -1048,6 +1132,109 @@ class World:
             sign_text.append(sign.getText(False).getMessage(i, True).tryCollapseToString())
         
         return sign_text
+        
+    @staticmethod
+    def find_nearest_entity(name_str: str="", type_str: str="") -> EntityData | None:
+        """
+        Finds the nearest entity matching the specified name and/or type.
+
+        Args:
+            name_str (str, optional): A substring to match in the entity's name. Defaults to "".
+            type_str (str, optional): A substring to match in the entity's type. Defaults to "".
+
+        Returns:
+            EntityData | None: The nearest matching entity, or None if no entity is found.
+        """
+        name_str = f"(?=.*{name_str})" if name_str else ""
+        name = rf"^(?!.*\b{player_name()}\b){name_str}.*"
+        if type_str:
+            el = entities(name=name, type=rf"(?=.*{type_str}).*", sort="nearest")
+        else:
+            el = entities(name=name, sort="nearest")
+        return el[0] if len(el) > 0 else None
+
+# # # TRADING # # #
+
+java_class_map.update({
+    "net.minecraft.network.protocol.game.ServerboundSelectTradePacket": "net.minecraft.class_2863"
+})
+java_member_map.update({
+    "getOffers": "method_17438",
+    "getCostA": "method_19272",
+    "getCostB": "method_8247",
+    "getResult": "method_8250",
+    "setSelectionHint": "method_7650",
+    "tryMoveItems": "method_20215"
+})
+
+ServerboundSelectTradePacket = JavaClass("net.minecraft.network.protocol.game.ServerboundSelectTradePacket")
+
+class Trading:
+    @staticmethod
+    def get_offers():
+        screen = mc.screen
+        if screen is None:
+            return None
+        
+        menu = screen.getMenu()
+        offers = menu.getOffers()
+        return offers
+    
+    @staticmethod
+    def get_offer(offer_index: int):
+        offers = Trading.get_offers()
+        if offers is None:
+            return None
+
+        offer = offers.get(offer_index)
+        return offer
+        
+    @staticmethod
+    def get_costA(offer_index: int, name_and_count: bool=False):
+        offer = Trading.get_offer(offer_index)
+        if offer is None:
+            return None
+        
+        item_stack = offer.getCostA()
+        if name_and_count:
+            return (_get_item_name(item_stack.getItem()), item_stack.getCount())
+        return item_stack
+    
+    @staticmethod
+    def get_costB(offer_index: int, name_and_count: bool=False):
+        offer = Trading.get_offer(offer_index)
+        if offer is None:
+            return None
+        
+        item_stack = offer.getCostB()
+        if name_and_count:
+            return (_get_item_name(item_stack.getItem()), item_stack.getCount())
+        return item_stack
+    
+    @staticmethod
+    def get_result(offer_index: int, name_and_count: bool=False):
+        offer = Trading.get_offer(offer_index)
+        if offer is None:
+            return None
+        
+        item_stack = offer.getResult()
+        if name_and_count:
+            return (_get_item_name(item_stack.getItem()), item_stack.getCount())
+        return item_stack
+    
+    @staticmethod
+    def trade_offer(offer_index: int):
+        screen = mc.screen
+        if screen is None:
+            return False
+        
+        menu = screen.getMenu()
+        menu.setSelectionHint(offer_index)
+        menu.tryMoveItems(offer_index)
+        Client.send_packet("ServerboundSelectTradePacket", offer_index)
+        
+        mc.gameMode.handleInventoryMouseClick(
+            menu.containerId, 2, 1, ClickType.QUICK_MOVE, mc.player)
 
 # # # UTIL # # #
 
@@ -1082,3 +1269,23 @@ class Util:
             string (str): The text to be copied to the clipboard.
         """
         mc.keyboardHandler.setClipboard(string)
+
+    @staticmethod
+    def get_distance(pos1: list, pos2: list | None=None) -> float:
+        """
+        Calculates the Euclidean distance between two 3D positions.
+        Args:
+            pos1 (list): The first position as a list of three coordinates [x, y, z].
+            pos2 (list, optional): The second position as a list of three coordinates [x, y, z].
+                If None, defaults to the current player position.
+        Returns:
+            float: The Euclidean distance between pos1 and pos2.
+        """
+        if pos2 is None:
+            pos2 = player_position()
+        
+        dx = pos1[0] - pos2[0]
+        dy = pos1[1] - pos2[1]
+        dz = pos1[2] - pos2[2]
+
+        return (dx**2 + dy**2 + dz**2)**0.5
