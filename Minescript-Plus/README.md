@@ -1,13 +1,30 @@
 # Minescript Plus
 
-**Version:** 0.11-alpha  
+**Version:** 0.13-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-08-11
+**Date:** 2025-09-13
 
-User-friendly API for scripts that adds extra functionality to the Minescript mod, using [`lib_java`](https://minescript.net/sdm_downloads/lib_java-v2/) and other libraries.  
+User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.
 
 ---
+
+## Requirements
+
+**For Minescript Plus v0.13-alpha or newer:**
+* Minecraft (any version supported by Minescript)
+* Minescript 5.0b6 or newer
+* Python 3.10 or higher
+* java module (already included with Minescript)
+* [`lib_nbt v1`](https://minescript.net/sdm_downloads/lib_nbt-v1/) (optional)
+
+\
+For Minescript Plus v0.12-alpha or earlier:
+* Minecraft (any version supported by Minescript)
+* Minescript 5.0b3 or earlier
+* Python 3.10 or higher
+* [`lib_java v2`](https://minescript.net/sdm_downloads/lib_java-v2/)
+* [`lib_nbt v1`](https://minescript.net/sdm_downloads/lib_nbt-v1/) (optional)
 
 ## Usage
 
@@ -16,7 +33,7 @@ First you need to download minescript_plus.py and place it in the /minescript fo
 Import the module in your script:
 
 ```python
-from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Util
+from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Trading, Hud, Util, Keybind, Event
 ```
 
 You don't need to import all the classes, just the ones you need. \
@@ -242,6 +259,127 @@ Methods for retrieving world information.
 - **get_targeted_sign_text() -> list[str]**  
   Retrieves the text from both the front and back sides of the sign block currently targeted by the player.  
   *Returns:* A list containing the text lines from the targeted sign (first four elements are the front, next four are the back).
+---
+
+### [`Trading`](Minescript-Plus/minescript_plus.py)
+
+Methods for interacting with Minecraft villager trading screens and offers.
+
+- **get_offers() -> MerchantOffers**  
+  Retrieves all merchant offers available in the current trading screen.  
+  *Returns:* The offers object, or `None` if no trading screen is open.
+
+- **get_offer(offer_index: int) -> MerchantOffer**  
+  Retrieves a specific merchant offer by index.  
+  *Returns:* The offer object, or `None` if not available.
+
+- **get_costA(offer_index: int, name_and_count: bool=False) -> tuple[str, int] | ItemStack | None**  
+  Gets the first cost item (costA) for a merchant offer. If `name_and_count` is `True`, returns a tuple `(name, count)`; otherwise returns the `ItemStack`.  
+  *Returns:* ItemStack or (name, count) tuple, or `None` if not available.
+
+- **get_costB(offer_index: int, name_and_count: bool=False) -> tuple[str, int] | ItemStack | None**  
+  Gets the second cost item (costB) for a merchant offer. If `name_and_count` is `True`, returns a tuple `(name, count)`; otherwise returns the `ItemStack`.  
+  *Returns:* ItemStack or (name, count) tuple, or `None` if not available.
+
+- **get_result(offer_index: int, name_and_count: bool=False) -> tuple[str, int] | ItemStack | None**  
+  Gets the result item for a merchant offer. If `name_and_count` is `True`, returns a tuple `(name, count)`; otherwise returns the `ItemStack`.  
+  *Returns:* ItemStack or (name, count) tuple, or `None` if not available.
+
+- **trade_offer(offer_index: int) -> bool**  
+  Executes a trade for the specified merchant offer index.  
+  *Returns:* `True` if trade was attempted, `False` if no trading screen is open.
+
+**Example:**
+```python
+from minescript_plus import Trading
+
+# Get all offers
+offers = Trading.get_offers()
+
+# Get the cost and result of the first offer
+costA = Trading.get_costA(0, name_and_count=True)
+costB = Trading.get_costB(0, name_and_count=True)
+result = Trading.get_result(0, name_and_count=True)
+print("CostA:", costA)
+print("CostB:", costB)
+print("Result:", result)
+
+# Trade the first offer
+if offers:
+    Trading.trade_offer(0)
+```
+
+---
+
+### [`Hud`](Minescript-Plus/minescript_plus.py)
+
+Methods for rendering custom text and items on the Minecraft HUD (Heads-Up Display).
+
+- **add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False) -> int**  
+  Adds a styled text string to the HUD at the specified position.  
+  *Returns:* The index of the added text.
+
+- **remove_text(i: int) -> None**  
+  Removes the text at the given index.
+
+- **clear_texts() -> None**  
+  Removes all custom HUD texts.
+
+- **get_texts() -> dict[int, tuple]**  
+  Returns a dictionary of all HUD texts and their properties.
+
+- **show_hud(enable: bool) -> None**  
+  Shows or hides all custom HUD elements.
+
+- **show_text(index: int, enable: bool) -> None**  
+  Shows or hides a specific HUD text by index.
+
+- **use_toggle_key(enable: bool) -> None**  
+  Enables or disables the toggle key for showing/hiding the HUD.
+
+- **set_toggle_key(toggle_key: int) -> None**  
+  Sets the key code used to toggle the HUD display.
+
+- **get_item_from_itemid(item_id: str)**  
+  Returns the item object for a given item ID.
+
+- **get_itemid_from_block_type(block_type: str) -> str**  
+  Gets the item ID corresponding to a block type.
+
+- **get_item_name(item) -> str**  
+  Returns the display name of an item.
+
+- **add_item(item_id: str, x: int, y: int, count: str="", scale: float=1.0) -> int**  
+  Adds an item icon to the HUD at the specified position.  
+  *Returns:* The index of the added item.
+
+- **remove_item(i: int) -> None**  
+  Removes the item at the given index.
+
+- **clear_items() -> None**  
+  Removes all custom HUD items.
+
+- **get_items() -> dict[int, tuple]**  
+  Returns a dictionary of all HUD items and their properties.
+
+- **show_item(index: int, enable: bool) -> None**  
+  Shows or hides a specific HUD item by index.
+
+**Example:**
+```python
+from minescript_plus import Hud
+
+# Add custom text to the HUD
+text_id = Hud.add_text("Hello World!", x=10, y=10, color=(0,255,0), scale=1.5, shadow=True)
+
+# Add an item icon to the HUD
+item_id = Hud.add_item("minecraft:diamond", x=50, y=10, count="5", scale=1.2)
+
+# Hide/show HUD elements
+Hud.show_hud(True)
+Hud.show_text(text_id, False)
+Hud.show_item(item_id, True)
+```
 
 ---
 
@@ -256,6 +394,10 @@ Utility methods.
 
 - **set_clipboard(string: str) -> int | None**  
   Sets the system clipboard to the specified string.
+
+- **get_distance(pos1: list, pos2: list | None=None) -> float**  
+  Calculates the Euclidean distance between two 3D positions.
+  If pos2 isn't defined, defaults to the current player position.
 
 ---
 

@@ -1,14 +1,16 @@
 """
     Minescript Plus
-    Version: 0.12-alpha
+    Version: 0.13-alpha
     Author: RazrCraft
-    Date: 2025-08-21
+    Date: 2025-09-03
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
     This module should be imported by other scripts and not run directly.
 
     Usage: Similar to Minescript, import minescript_plus  # from Python script
+
+    Minimum requirements: Minecaft 1.21.8, Minescript 5.0b6, Python 3.10
     
     Note: Some code shared by @maxuser (Minescript's creator) on the 
     official discord was used in this API, mostly in the Inventory class.
@@ -18,16 +20,18 @@ import threading
 from sys import exit, stderr # pylint: disable=W0622
 from time import sleep
 from typing import Callable, Literal, Any
+from dataclasses import dataclass, asdict
 from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock,
                         player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name,
                         job_info, container_get_items, player_position, entities)
+from minescript import VersionInfo as VF
 from minescript import version_info as ver_info
-from lib_java import JavaClass, java_class_map, java_member_map
+from java import JavaClass, eval_pyjinn_script
 import lib_nbt
 
 set_default_executor(script_loop)
 
-_ver: str = "0.12-alpha-dev"
+_ver: str = "0.13-alpha"
 _intermediary_mc_ver = "1.21.8"
 
 if __name__ == "__main__":
@@ -35,9 +39,6 @@ if __name__ == "__main__":
     exit(1)
 
 fabric = ver_info().minecraft_class_name == "net.minecraft.class_310"
-
-from dataclasses import dataclass, asdict
-from minescript import VersionInfo as VF
 
 @dataclass
 class VersionInfo(VF):
@@ -257,114 +258,10 @@ class Keybind:
                             callback()
                         except Exception as e:
                             print(f"[Keybind] Error in callback for key {key}: {e}")
-    
 
-# Mojang -> Intermediary mappings
-if fabric:
-    java_class_map.update({
-        "net.minecraft.client.Minecraft": "net.minecraft.class_310",                # net.minecraft.client.MinecraftClient
-        "net.minecraft.world.inventory.ClickType": "net.minecraft.class_1713",      # net.minecraft.screen.slot.SlotActionType
-        "net.minecraft.network.chat.Component": "net.minecraft.class_2561",         # net.minecraft.network.chat.Text
-        "net.minecraft.client.KeyMapping": "net.minecraft.class_304",               # net.minecraft.client.option.KeyBinding
-        "com.mojang.blaze3d.platform.InputConstants": "net.minecraft.class_3675",   # net.minecraft.client.util.InputUtil
-        "net.minecraft.world.Difficulty": "net.minecraft.class_1267",
-        "net.minecraft.core.BlockPos": "net.minecraft.class_2338"
-    })
-    java_member_map.update({
-        "getInstance": "method_1551",
-        "getConnection": "method_48296",
-        "disconnect": "method_10747",
-        "options": "field_1690",
-        "name": "field_3752",
-        "ip": "field_3761",
-        "status": "field_3753",  # playerCountLabel
-        "motd": "field_3757",
-        "ping": "field_3758",
-        "protocol": "field_3756",
-        "version": "field_3760",
-        "playerList": "field_3762",
-        "pauseGame": "method_20539", # openGameMenu
-        "isLocalServer": "method_1542", # isInSingleplayer
-        "isMultiplayerServer": "method_31321", # isConnectedToServer
-        "isLan": "method_2994",
-        "isRealm": "method_52811",
-        "getLatency": "method_2959",
-        "getGameMode": "method_2958",
-        "getProfile": "method_2966",
-        #"getName": "method_8381",
-        "getName": "getName",
-        "getTabListDisplayName": "method_2971",
-        "getTabListOrder": "method_62154",
-        "getTeam": "method_2955",
-        "getDisplayName": "method_1140",
-        "getColor": "method_1202",
-        "isCreative": "method_8386",
-        "isSurvival": "method_8388",
-        "level": "field_1687",
-        "getLevel": "method_2890", # getWorld
-        "getLevelData": "method_28104", # getLevelProperties
-        "isRaining": "method_156",
-        "isThundering": "method_203",
-        "isHardcore": "method_152",
-        "getDifficulty": "method_207",
-        "getSpawnPos": "method_56126",
-        "getGameTime": "method_188", # getTime
-        "getDayTime": "method_217", # getTimeOfDay
-        "setScreen": "method_1507",
-        "player": "field_1724",
-        "connection": "field_3944",
-        "screen": "field_1755",
-        "gui": "field_1705",
-        "gameMode": "field_1761",
-        "keyboardHandler": "field_1774",
-        "getClipboard": "method_1460",
-        "setClipboard": "method_1455",
-        "handleInventoryMouseClick": "method_2906",
-        "getMenu": "method_17577",
-        "containerId": "field_7763",
-        "keyPressed": "method_25404",
-        "quickMoveStack": "method_7601",
-        "literal": "method_43470",
-        "title": "field_2016",
-        "subtitle": "field_2039",
-        "tryCollapseToString": "method_54160",  # getLiteralString()
-        "setTitle": "method_34004",             # setTitle(Text title)
-        "setSubtitle": "method_34002",          # setSubtitle(Text subtitle)
-        "setTimes": "method_34001",             # setTitleTicks(int fadeInTicks, int stayTicks, int fadeOutTicks)
-        "resetTitleTimes": "method_1742",       # setDefaultTitleFade()
-        "clearTitles": "method_34003",          # clearTitle()
-        "setOverlayMessage": "method_1758",     # Gui.setOverlayMessage(Text message, boolean tinted)               # Actionbar
-        "overlayMessageString": "field_2018",   # overlayMessage # Actionbar
-        "getTabList": "method_1750",            # getPlayerListHud()
-        "getPlayerInfos": "method_48213",       # collectPlayerEntries()                                            #  TabList
-        "getOnlinePlayers": "method_2880",      # getPlayerList()
-        "getListedOnlinePlayers": "method_45732",  # getListedPlayerListEntries()
-        "getPlayerInfo": "method_2874",         # getPlayerListEntry(String profileName)
-        "getSkin": "method_52810",              # getSkinTextures()
-        "textureUrl": "comp_1911",
-        "getServerData": "method_45734",        # getServerInfo() 
-        "click": "method_1420",                 # onKeyPressed(InputUtil$Key key)
-        #"set": "method_1416",                   # setKeyPressed(InputUtil$Key key, boolean pressed)
-        "set": "method_41748",                  # setValue(T value)                                                 # OptionInstance
-        #"get": "method_41753",                  # getValue()                                                        # OptionInstance
-        "value": "field_37868",                 # value                                                             # OptionInstance
-        "getKey": "method_15981",               # fromTranslationKey(String translationKey)
-        "UNKNOWN": "field_16237",               # UNKNOWN_KEY
-        "getFoodData": "method_7344",           # getHungerManager
-        "getFoodLevel": "method_7586",
-        "setFoodLevel": "method_7580",
-        "getSaturationLevel": "method_7589",
-        "setSaturation": "method_7581",
-        "getBlockEntity": "method_8321",
-        "getText": "method_49843",
-        "getMessage": "method_49859",
-        "send": "method_10743",
-        "getItem": "method_7909",
-        "getCount": "method_7947",
-        "mouseHandler": "field_1729",
-        "mouseGrabbed": "field_1783"
-    })
-
+Array = JavaClass("java.lang.reflect.Array")
+Clazz = JavaClass("java.lang.Class")
+Minescript = JavaClass("net.minescript.common.Minescript")
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
 ClickType = JavaClass("net.minecraft.world.inventory.ClickType")
 Component = JavaClass("net.minecraft.network.chat.Component")
@@ -372,7 +269,10 @@ KeyMapping = JavaClass("net.minecraft.client.KeyMapping")
 InputConstants = JavaClass("com.mojang.blaze3d.platform.InputConstants")
 Difficulty = JavaClass("net.minecraft.world.Difficulty")
 BlockPos = JavaClass("net.minecraft.core.BlockPos")
+MerchantOffers = JavaClass("net.minecraft.world.item.trading.MerchantOffers")
+MerchantOffer = JavaClass("net.minecraft.world.item.trading.MerchantOffer")
 
+mappings = Minescript.mappingsLoader.get()
 mc = Minecraft.getInstance()
 
 mc.gui.setOverlayMessage(None, False)
@@ -394,30 +294,26 @@ def _get_private_field(clazz, field_name, super_class: bool=False): # type: igno
         c = clazz.getClass().getSuperclass()
     else:
         c = clazz.getClass()
-    f = java_member_map.get(field_name)
+    f = mappings.getRuntimeFieldName(c, field_name)
     field = c.getDeclaredField(f)
     field.setAccessible(True)
     return field.get(clazz)
 
-def _get_game_mode_name(c):
-    if fabric:
-        return c.method_8381()
-    return c.getName()
-
-def _get_item_name(c):
-    if fabric:
-        return c.method_63680().getString()
-    return c.getName().getString()
+def _call_private_method(clazz, intermediary: str):
+    methods = clazz.getClass().getDeclaredMethods()
+    for method in methods:
+        if method.getName() == intermediary:
+            method.setAccessible(True)
+            parameter_type = Array.newInstance(Clazz, 0)
+            return method.invoke(clazz, parameter_type)
 
 def _set_grab_mouse():
     clazz = mc.mouseHandler
     field_name = "mouseGrabbed"
     c = clazz.getClass()
-    f = java_member_map.get(field_name)
+    f = mappings.getRuntimeFieldName(c, field_name)
     field = c.getDeclaredField(f)
     field.setAccessible(True)
-    #print(field.get(clazz))
-    #field.set(clazz, True)
     field.setBoolean(clazz, True)
     
 # # # INVENTORY # # #
@@ -600,9 +496,6 @@ class Inventory:
 
 # # # SCREEN # # #
 
-java_class_map.update({
-    "net.minecraft.network.protocol.game.ServerboundContainerClosePacket": "net.minecraft.class_2815"
-})
 with render_loop:
     class Screen:
         @staticmethod
@@ -641,9 +534,11 @@ with render_loop:
             """
             screen = mc.screen
             if screen is not None:
-                mc.setScreen(None)
-                Client.send_packet("ServerboundContainerClosePacket", screen.getMenu().containerId)
-                _set_grab_mouse()
+                with render_loop:
+                    container_id = screen.getMenu().containerId
+                    mc.setScreen(None)
+                    Client.send_packet("ServerboundContainerClosePacket", container_id)
+                    _set_grab_mouse()
 
 # # # GUI # # #
 
@@ -777,10 +672,7 @@ class Key:
     def __press_keybind(keybind, state: bool):
         if state:
             KeyMapping.click(keybind)
-        if fabric:
-            KeyMapping.method_1416(keybind, state)
-        else:
-            KeyMapping.set(keybind, state)
+        KeyMapping.set(keybind, state)
 
     @staticmethod
     def press_key(key_name: str, state: bool):
@@ -819,11 +711,9 @@ class Client:
 
     @staticmethod
     def is_multiplayer_server() -> bool:
-        c = mc.getClass()
-        m = java_member_map.get("isMultiplayerServer")
-        method = c.getDeclaredMethod(m)
-        method.setAccessible(True)
-        return method.invoke(mc) # type: ignore
+        if fabric:
+            return _call_private_method(mc, "method_31321") # type: ignore
+        return _call_private_method(mc, "isMultiplayerServer") # type: ignore
 
     @staticmethod
     def disconnect():
@@ -890,7 +780,7 @@ class Player:
             str: The game mode of the player as a string.
         """
         name = player_name()
-        return _get_game_mode_name(Player.__get_player_info(name).getGameMode())
+        return Player.__get_player_info(name).getGameMode().getName()
 
     @staticmethod
     def is_creative() -> bool:
@@ -1024,7 +914,7 @@ class Server:
                 "Name": name,
                 "UUID": pi_list[i].getProfile().getId().toString(),
                 "Latency": pi_list[i].getLatency(),
-                "GameMode": _get_game_mode_name(pi_list[i].getGameMode()),
+                "GameMode": pi_list[i].getGameMode().getName(),
                 "SkinURL": pi_list[i].getSkin().textureUrl(),
                 "TablistOrder": pi_list[i].getTabListOrder()
                 })
@@ -1111,7 +1001,7 @@ class World:
         return World.__get_level_data().getDayTime() # type: ignore
    
     @staticmethod
-    def get_targeted_sign_text() -> list[str]:
+    def get_targeted_sign_text() -> list[str] | None:
         """
         Retrieves the text from both the front and back sides of the sign block currently targeted by the player.
         
@@ -1122,6 +1012,9 @@ class World:
         pos = BlockPos(*position)
 
         sign = mc.level.getBlockEntity(pos)
+        if sign is None:
+            return None
+        
         sign_text = []
         
         # Front
@@ -1155,23 +1048,14 @@ class World:
 
 # # # TRADING # # #
 
-java_class_map.update({
-    "net.minecraft.network.protocol.game.ServerboundSelectTradePacket": "net.minecraft.class_2863"
-})
-java_member_map.update({
-    "getOffers": "method_17438",
-    "getCostA": "method_19272",
-    "getCostB": "method_8247",
-    "getResult": "method_8250",
-    "setSelectionHint": "method_7650",
-    "tryMoveItems": "method_20215"
-})
-
-ServerboundSelectTradePacket = JavaClass("net.minecraft.network.protocol.game.ServerboundSelectTradePacket")
-
 class Trading:
     @staticmethod
-    def get_offers():
+    def get_offers() -> MerchantOffers | None:
+        """
+        Retrieves all merchant offers available in the current trading screen.
+        Returns:
+            MerchantOffers: The offers object, or None if no trading screen is open.
+        """
         screen = mc.screen
         if screen is None:
             return None
@@ -1181,7 +1065,14 @@ class Trading:
         return offers
     
     @staticmethod
-    def get_offer(offer_index: int):
+    def get_offer(offer_index: int) -> MerchantOffer | None:
+        """
+        Retrieves a specific merchant offer by index.
+        Args:
+            offer_index (int): The index of the offer.
+        Returns:
+            MerchantOffer: The offer object, or None if not available.
+        """
         offers = Trading.get_offers()
         if offers is None:
             return None
@@ -1190,43 +1081,74 @@ class Trading:
         return offer
         
     @staticmethod
-    def get_costA(offer_index: int, name_and_count: bool=False):
+    def get_costA(offer_index: int, name_and_count: bool=False) -> tuple[str, int] | ItemStack | None:
+        """
+        Gets the first cost item (costA) for a merchant offer.
+        Args:
+            offer_index (int): The offer index.
+            name_and_count (bool, optional): If True, returns (name, count) tuple. Default: False
+        Returns:
+            tuple[str, int] | ItemStack | None: ItemStack or (name, count) tuple, or None if not available.
+        """
         offer = Trading.get_offer(offer_index)
         if offer is None:
             return None
         
         item_stack = offer.getCostA()
         if name_and_count:
-            return (_get_item_name(item_stack.getItem()), item_stack.getCount())
+            return (item_stack.getItem().getName().getString(), item_stack.getCount())
         return item_stack
     
     @staticmethod
-    def get_costB(offer_index: int, name_and_count: bool=False):
+    def get_costB(offer_index: int, name_and_count: bool=False) -> tuple[str, int] | ItemStack | None:
+        """
+        Gets the second cost item (costB) for a merchant offer.
+        Args:
+            offer_index (int): The offer index.
+            name_and_count (bool, optional): If True, returns (name, count) tuple. Default: False
+        Returns:
+            tuple[str, int] | ItemStack | None: ItemStack or (name, count) tuple, or None if not available.
+        """
         offer = Trading.get_offer(offer_index)
         if offer is None:
             return None
         
         item_stack = offer.getCostB()
         if name_and_count:
-            return (_get_item_name(item_stack.getItem()), item_stack.getCount())
+            return (item_stack.getItem().getName().getString(), item_stack.getCount())
         return item_stack
     
     @staticmethod
-    def get_result(offer_index: int, name_and_count: bool=False):
+    def get_result(offer_index: int, name_and_count: bool=False) -> tuple[str, int] | ItemStack | None:
+        """
+        Gets the result item for a merchant offer.
+        Args:
+            offer_index (int): The offer index.
+            name_and_count (bool, optional): If True, returns (name, count) tuple. Default: False
+        Returns:
+            tuple[str, int] | ItemStack | None: ItemStack or (name, count) tuple, or None if not available.
+        """
         offer = Trading.get_offer(offer_index)
         if offer is None:
             return None
         
         item_stack = offer.getResult()
         if name_and_count:
-            return (_get_item_name(item_stack.getItem()), item_stack.getCount())
+            return (item_stack.getItem().getName().getString(), item_stack.getCount())
         return item_stack
     
     @staticmethod
     def trade_offer(offer_index: int):
+        """
+        Executes a trade for the specified merchant offer index.
+        Args:
+            offer_index (int): The index of the offer to trade.
+        Returns:
+            None if no trading screen is open.
+        """
         screen = mc.screen
         if screen is None:
-            return False
+            return None
         
         menu = screen.getMenu()
         menu.setSelectionHint(offer_index)
@@ -1289,3 +1211,363 @@ class Util:
         dz = pos1[2] - pos2[2]
 
         return (dx**2 + dy**2 + dz**2)**0.5
+
+# # # HUD # # #
+
+pyj_hud = eval_pyjinn_script(r"""
+Minecraft = JavaClass("net.minecraft.client.Minecraft")
+HudRenderCallback = JavaClass("net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback")
+ARGB = JavaClass("net.minecraft.util.ARGB")
+Component = JavaClass("net.minecraft.network.chat.Component")
+ChatFormatting = JavaClass("net.minecraft.ChatFormatting")
+BuiltInRegistries = JavaClass("net.minecraft.core.registries.BuiltInRegistries")
+ResourceLocation = JavaClass("net.minecraft.resources.ResourceLocation")
+ItemStack = JavaClass("net.minecraft.world.item.ItemStack")
+Items = JavaClass("net.minecraft.world.item.Items")
+Item = JavaClass("net.minecraft.world.item.Item")
+
+mc = Minecraft.getInstance()
+
+toggle_key = 301  # F12
+tl = None
+frames = 0
+show = False
+_texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool]] = {}
+_ti: int = 0
+_items: dict[int, tuple[bool, str, int, int, str, float]] = {}
+_ii: int = 0
+
+def _add_text(*t):
+    global _texts
+    global _ti
+    
+    _texts[_ti] = tuple(t)
+    _ti += 1
+    return _ti - 1
+
+def _remove_text(i):
+    global _texts
+    global _ti
+
+    del _texts[i]
+    _ti -= 1
+
+def _clear_texts():
+    global _texts
+    
+    _texts.clear()
+
+def _get_texts():
+    return _texts
+
+def _show_hud(enable: bool):
+    global show
+
+    show = enable
+
+def _show_text(index: int, enable: bool):
+    global _texts
+    
+    old = _texts[index]
+    #_texts[index] = (enable, *old[1:])
+    a, b, c, d, e, f, g, h, i, j, k, l, m = old[1:]
+    _texts[index] = (enable, a, b, c, d, e, f, g, h, i, j, k, l, m)
+
+def on_press_key(event):
+    global show
+
+    if event.action == 0 and event.key == toggle_key:
+        show = not show
+
+def _use_toggle_key(enable: bool):
+    global tl
+    
+    if enable and tl is None:
+            tl = add_event_listener("key", on_press_key)
+    else:
+        if tl is not None:
+            remove_listener(tl)
+            tl = None
+
+def _set_toggle_key(tk: int):
+    global toggle_key
+    
+    toggle_key = tk
+
+def _get_item_from_itemid(item_id: str) -> Item:
+    id = ResourceLocation.parse(item_id)
+    return BuiltInRegistries.ITEM.getValue(id)
+
+def _get_item_name(item: Item) -> str:
+    return item.getName().getString()
+
+def _add_item(*t):
+    global _items
+    global _ii
+    
+    _items[_ii] = tuple(t)
+    _ii += 1
+    return _ii - 1
+
+def _remove_item(i):
+    global _items
+    global _ti
+
+    del _items[i]
+    _ii -= 1
+
+def _clear_items():
+    global _items
+    
+    _items.clear()
+    
+def _get_items():
+    return _items
+
+def _show_item(index: int, enable: bool):
+    global _items
+    
+    old = _items[index]
+    #_items[index] = (enable, *old[1:])
+    a, b, c, d, e = old[1:]
+    _items[index] = (enable, a, b, c, d, e)
+    
+def on_hud_render(guiGraphics, tickDeltaManager):
+    global frames
+    
+    if not show:
+        return
+    
+    for t in _texts:
+        state, text, x, y, r, g, b, alpha, scale, shadow, italic, underline, strikethrough, obfsucated = _texts[t]
+        
+        if state:
+            styled_text = Component.literal(text)
+            if italic:
+                styled_text = styled_text.withStyle(ChatFormatting.ITALIC)
+            if underline:
+                styled_text = styled_text.withStyle(ChatFormatting.UNDERLINE)
+            if strikethrough:
+                styled_text = styled_text.withStyle(ChatFormatting.STRIKETHROUGH)
+            if obfsucated:
+                styled_text = styled_text.withStyle(ChatFormatting.OBFUSCATED)
+            color: int = ARGB.color(alpha, r, g, b)
+            
+            pose_stack = guiGraphics.pose()
+            pose_stack.pushMatrix()
+            scale = float(scale)
+            pose_stack.scale(scale, scale)
+            scaled_X: int = int(x / scale)
+            scaled_Y: int = int(y / scale)
+            
+            guiGraphics.drawString(mc.font, styled_text, scaled_X, scaled_Y, color, shadow)
+            
+            pose_stack.popMatrix()
+    
+    for i in _items:
+        state, item_id, x, y, count, scale = _items[i]
+        
+        if state:
+            pose_stack = guiGraphics.pose()
+            pose_stack.pushMatrix()
+            scale = float(scale)
+            pose_stack.scale(scale, scale)
+            scaled_X: int = int(x / scale)
+            scaled_Y: int = int(y / scale)
+            
+            item = _get_item_from_itemid(item_id)
+            item_stack = ItemStack(item)
+            
+            guiGraphics.renderItem(item_stack, scaled_X, scaled_Y)
+            if count != "":
+                guiGraphics.renderItemCount(mc.font, item_stack, scaled_X, scaled_Y, count)
+            
+            pose_stack.popMatrix()
+
+
+callback = ManagedCallback(on_hud_render)
+HudRenderCallback.EVENT.register(HudRenderCallback(callback))
+
+# Cancel after 1 second (1000 milliseconds):
+#set_timeout(callback.cancel, 5000)
+""")
+
+_add_text = pyj_hud.getFunction("_add_text")
+_remove_text = pyj_hud.getFunction("_remove_text")
+_clear_texts = pyj_hud.getFunction("_clear_texts")
+_get_texts = pyj_hud.getFunction("_get_texts")
+_show_hud = pyj_hud.getFunction("_show_hud")
+_show_text = pyj_hud.getFunction("_show_text")
+_use_toggle_key = pyj_hud.getFunction("_use_toggle_key")
+_set_toggle_key = pyj_hud.getFunction("_set_toggle_key")
+_get_item_from_itemid = pyj_hud.getFunction("_get_item_from_itemid")
+_get_item_name = pyj_hud.getFunction("_get_item_name")
+_add_item = pyj_hud.getFunction("_add_item")
+_remove_item = pyj_hud.getFunction("_remove_item")
+_clear_items = pyj_hud.getFunction("_clear_items")
+_get_items = pyj_hud.getFunction("_get_items")
+_show_item = pyj_hud.getFunction("_show_item")
+
+class Hud:
+    @staticmethod
+    def add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
+        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False) -> int:
+        """
+        Adds a text string to the Minecraft HUD at the specified position.
+        Args:
+            text (str): The text to display.
+            x (int): X position on screen.
+            y (int): Y position on screen.
+            color (tuple, optional): RGB color tuple. Default: (255,255,255)
+            alpha (int, optional): Alpha transparency. Default: 255
+            scale (float, optional): Text scale. Default: 1.0
+            shadow, italic, underline, strikethrough, obfsucated (bool, optional): Text effects.
+        Returns:
+            int: Index of the added text.
+        """
+        return _add_text(True, text, x, y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated) # type: ignore
+        
+    @staticmethod
+    def remove_text(i: int):
+        """
+        Removes a text entry from the HUD by its index.
+        Args:
+            i (int): Index of the text to remove.
+        """
+        _remove_text(i)
+    
+    @staticmethod
+    def clear_texts():
+        """
+        Removes all texts entries from the HUD.
+        """
+        _clear_texts()
+    
+    @staticmethod
+    def get_texts() -> dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool]]:
+        """
+        Returns all HUD text entries and their properties.
+        Returns:
+            dict: Mapping of index to text properties.
+        """
+        return _get_texts() # type: ignore
+
+    @staticmethod
+    def show_hud(enable: bool):
+        """
+        Enables or disables display of all HUD content.
+        Args:
+            enable (bool): True to show, False to hide.
+        """
+        _show_hud(enable)
+
+    @staticmethod
+    def show_text(index: int, enable: bool):
+        """
+        Shows or hides a specific HUD text entry.
+        Args:
+            index (int): Index of the text.
+            enable (bool): True to show, False to hide.
+        """
+        _show_text(index, enable)
+
+    @staticmethod
+    def use_toggle_key(enable: bool):
+        """
+        Enables or disables the HUD toggle key (default F12).
+        Args:
+            enable (bool): True to allow toggling HUD with key.
+        """
+        _use_toggle_key(enable)
+
+    @staticmethod
+    def set_toggle_key(toggle_key: int):
+        """
+        Sets the key code used to toggle HUD display (GLFW key code).
+        Args:
+            toggle_key (int): GLFW key code to use for toggling.
+        """
+        _set_toggle_key(toggle_key)
+
+    @staticmethod
+    def get_item_from_itemid(item_id: str):
+        """
+        Gets the item object from its item ID string.
+        Args:
+            item_id (str): The item ID.
+        Returns:
+            Item: The item object.
+        """
+        return _get_item_from_itemid(item_id)
+    
+    @staticmethod
+    def get_itemid_from_block_type(block_type: str) -> str:
+        """
+        Extracts the item ID from a block type string.
+        Args:
+            block_type (str): The block type string.
+        Returns:
+            str: The item ID.
+        """
+        return block_type.split(r"\[")[0]
+    
+    @staticmethod
+    def get_item_name(item) -> str:
+        """
+        Gets the display name of an item.
+        Args:
+            item: The item object.
+        Returns:
+            str: The item name.
+        """
+        return _get_item_name(item) # type: ignore
+    
+    @staticmethod
+    def add_item(item_id: str, x: int, y: int, count: str="", scale: float=1.0) -> int:
+        """
+        Adds an item icon to the HUD at the specified position.
+        Args:
+            item_id (str): The item ID to display.
+            x (int): X position on screen.
+            y (int): Y position on screen.
+            count (str, optional): Text to show as item count. Default: ""
+            scale (float, optional): Icon scale. Default: 1.0
+        Returns:
+            int: Index of the added item.
+        """
+        return _add_item(True, item_id, x, y, count, scale) # type: ignore
+        
+    @staticmethod
+    def remove_item(i: int):
+        """
+        Removes an item entry from the HUD by its index.
+        Args:
+            i (int): Index of the item to remove.
+        """
+        _remove_item(i)
+    
+    @staticmethod
+    def clear_items():
+        """
+        Removes all items entries from the HUD.
+        """
+        _clear_items()
+        
+    @staticmethod
+    def get_items() -> dict[int, tuple[bool, str, int, int, str, float]]:
+        """
+        Returns all HUD item entries and their properties.
+        Returns:
+            dict: Mapping of index to item properties.
+        """
+        return _get_items() # type: ignore
+
+    @staticmethod
+    def show_item(index: int, enable: bool):
+        """
+        Shows or hides a specific HUD item entry.
+        Args:
+            index (int): Index of the item.
+            enable (bool): True to show, False to hide.
+        """
+        _show_item(index, enable)
