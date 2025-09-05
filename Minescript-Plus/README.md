@@ -146,7 +146,7 @@ Gui.set_actionbar("Actionbar message", tinted=True)
 Methods for simulating key presses.
 
 - **press_key(key_name: str, state: bool) -> None**  
-  Simulates pressing or releasing a key by name.
+  Simulates pressing or releasing a key by name. (List of key codes used by Minecraft: https://minecraft.wiki/w/Key_codes#Current)
 
 ---
 

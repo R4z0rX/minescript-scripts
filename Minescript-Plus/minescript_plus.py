@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.13-alpha
+    Version: 0.13.1-alpha
     Author: RazrCraft
-    Date: 2025-09-03
+    Date: 2025-09-04
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -31,7 +31,7 @@ import lib_nbt
 
 set_default_executor(script_loop)
 
-_ver: str = "0.13-alpha"
+_ver: str = "0.13.1-alpha"
 _intermediary_mc_ver = "1.21.8"
 
 if __name__ == "__main__":
@@ -269,8 +269,6 @@ KeyMapping = JavaClass("net.minecraft.client.KeyMapping")
 InputConstants = JavaClass("com.mojang.blaze3d.platform.InputConstants")
 Difficulty = JavaClass("net.minecraft.world.Difficulty")
 BlockPos = JavaClass("net.minecraft.core.BlockPos")
-MerchantOffers = JavaClass("net.minecraft.world.item.trading.MerchantOffers")
-MerchantOffer = JavaClass("net.minecraft.world.item.trading.MerchantOffer")
 
 mappings = Minescript.mappingsLoader.get()
 mc = Minecraft.getInstance()
@@ -1050,7 +1048,7 @@ class World:
 
 class Trading:
     @staticmethod
-    def get_offers() -> MerchantOffers | None:
+    def get_offers():
         """
         Retrieves all merchant offers available in the current trading screen.
         Returns:
@@ -1065,7 +1063,7 @@ class Trading:
         return offers
     
     @staticmethod
-    def get_offer(offer_index: int) -> MerchantOffer | None:
+    def get_offer(offer_index: int):
         """
         Retrieves a specific merchant offer by index.
         Args:
