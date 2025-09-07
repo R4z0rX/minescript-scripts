@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.13-alpha  
+**Version:** 0.13.2-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-09-13
+**Date:** 2025-09-07
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.
@@ -319,8 +319,11 @@ Methods for rendering custom text and items on the Minecraft HUD (Heads-Up Displ
   Adds a styled text string to the HUD at the specified position.  
   *Returns:* The index of the added text.
 
-- **remove_text(i: int) -> None**  
-  Removes the text at the given index.
+- **set_text(index: int, text: str) -> None**  
+  Change the text of an existing entry with the given index.
+
+- **remove_text(index: int) -> None**  
+  Removes the text with the given index.
 
 - **clear_texts() -> None**  
   Removes all custom HUD texts.
@@ -353,8 +356,8 @@ Methods for rendering custom text and items on the Minecraft HUD (Heads-Up Displ
   Adds an item icon to the HUD at the specified position.  
   *Returns:* The index of the added item.
 
-- **remove_item(i: int) -> None**  
-  Removes the item at the given index.
+- **remove_item(index: int) -> None**  
+  Removes the item with the given index.
 
 - **clear_items() -> None**  
   Removes all custom HUD items.

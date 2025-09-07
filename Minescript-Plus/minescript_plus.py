@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.13.1-alpha
+    Version: 0.13.2-alpha
     Author: RazrCraft
-    Date: 2025-09-04
+    Date: 2025-09-07
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -31,7 +31,7 @@ import lib_nbt
 
 set_default_executor(script_loop)
 
-_ver: str = "0.13.1-alpha"
+_ver: str = "0.13.2-alpha"
 _intermediary_mc_ver = "1.21.8"
 
 if __name__ == "__main__":
@@ -1229,7 +1229,7 @@ mc = Minecraft.getInstance()
 toggle_key = 301  # F12
 tl = None
 frames = 0
-show = False
+show = True
 _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool]] = {}
 _ti: int = 0
 _items: dict[int, tuple[bool, str, int, int, str, float]] = {}
@@ -1242,6 +1242,13 @@ def _add_text(*t):
     _texts[_ti] = tuple(t)
     _ti += 1
     return _ti - 1
+
+def _set_text(index: int, text: str):
+    global _texts
+    
+    old = _texts[index]
+    a, _, c, d, e, f, g, h, i, j, k, l, m, n = old
+    _texts[index] = (a, text, c, d, e, f, g, h, i, j, k, l, m, n)
 
 def _remove_text(i):
     global _texts
@@ -1391,6 +1398,7 @@ HudRenderCallback.EVENT.register(HudRenderCallback(callback))
 """)
 
 _add_text = pyj_hud.getFunction("_add_text")
+_set_text = pyj_hud.getFunction("_set_text")
 _remove_text = pyj_hud.getFunction("_remove_text")
 _clear_texts = pyj_hud.getFunction("_clear_texts")
 _get_texts = pyj_hud.getFunction("_get_texts")
@@ -1424,15 +1432,25 @@ class Hud:
             int: Index of the added text.
         """
         return _add_text(True, text, x, y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated) # type: ignore
+
+    @staticmethod
+    def set_text(index: int, text: str):
+        """
+        Change the text of an existing entry by its index.
+        Args:
+            index (int): Index of the text to change.
+            text (str): New text
+        """
+        _set_text(index, text)
         
     @staticmethod
-    def remove_text(i: int):
+    def remove_text(index: int):
         """
         Removes a text entry from the HUD by its index.
         Args:
-            i (int): Index of the text to remove.
+            index (int): Index of the text to remove.
         """
-        _remove_text(i)
+        _remove_text(index)
     
     @staticmethod
     def clear_texts():
@@ -1536,13 +1554,13 @@ class Hud:
         return _add_item(True, item_id, x, y, count, scale) # type: ignore
         
     @staticmethod
-    def remove_item(i: int):
+    def remove_item(index: int):
         """
         Removes an item entry from the HUD by its index.
         Args:
-            i (int): Index of the item to remove.
+            index (int): Index of the item to remove.
         """
-        _remove_item(i)
+        _remove_item(index)
     
     @staticmethod
     def clear_items():
