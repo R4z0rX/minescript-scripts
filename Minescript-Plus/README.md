@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.13.2-alpha  
+**Version:** 0.14.0-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-09-07
+**Date:** 2025-09-23
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.
@@ -16,15 +16,19 @@ This module should be imported by other scripts and not run directly.
 * Minescript 5.0b6 or newer
 * Python 3.10 or higher
 * java module (already included with Minescript)
-* [`lib_nbt v1`](https://minescript.net/sdm_downloads/lib_nbt-v1/) (optional)
+* Mappings (if you use Fabric, more info [`here`](https://minescript.net/mappings))
+* Fabric API mod (optional, for `Hud` class only) 
+* [`lib_nbt v1`](https://minescript.net/sdm_downloads/lib_nbt-v1/) (optional, for `Inventory.find_item()` only)
 
 \
 For Minescript Plus v0.12-alpha or earlier:
+(Although I never tried it on versions before 1.21.4)
+
 * Minecraft (any version supported by Minescript)
 * Minescript 5.0b3 or earlier
 * Python 3.10 or higher
 * [`lib_java v2`](https://minescript.net/sdm_downloads/lib_java-v2/)
-* [`lib_nbt v1`](https://minescript.net/sdm_downloads/lib_nbt-v1/) (optional)
+* [`lib_nbt v1`](https://minescript.net/sdm_downloads/lib_nbt-v1/) (optional, for `Inventory.find_item()` only)
 
 ## Usage
 
@@ -159,20 +163,24 @@ Methods for client-level actions.
 - **is_local_server() -> bool**  
   Determines if the server is running locally (is single player).
 
+- **is_multiplayer_server() -> bool**
+  Determines whether the current Minecraft instance is connected to a multiplayer server.
+
 - **disconnect() -> None**  
   Disconnects the current Minecraft network connection with a custom message.
 
 - **get_options()**  
   Returns an instance of the game options.  
-  Use `Client.get_options().<option_name>().value` to get an option value.  
-  Example: print("FOV:", Client.get_options().fov().value)
+  Use `Client.get_options().<option_name>().value` to get an option value.
+  Use `Client.get_options().<option_name>().set(<value>)` to set an option value. 
 
 **Example:**
 ```python
 from minescript_plus import Client
 options = Client.get_options()
 print("FOV:", options.fov().value)
-print("Gamma:", options.gamma().value)
+print("Gamma:", .options.gamma().get())
+options.fov().set(90)
 ```
 
 ---
@@ -313,7 +321,7 @@ if offers:
 
 ### [`Hud`](Minescript-Plus/minescript_plus.py)
 
-Methods for rendering custom text and items on the Minecraft HUD (Heads-Up Display).
+Methods for rendering custom text and items on the Minecraft HUD (Heads-Up Display). Requires **Fabric API** mod.
 
 - **add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False) -> int**  
   Adds a styled text string to the HUD at the specified position.  
@@ -401,6 +409,55 @@ Utility methods.
 - **get_distance(pos1: list, pos2: list | None=None) -> float**  
   Calculates the Euclidean distance between two 3D positions.
   If pos2 isn't defined, defaults to the current player position.
+  
+- **get_nbt(obj: dict, path: str, default=None) -> Any**  
+  Get a value from nested SNBT data using dot notation.
+
+**Example:**
+```python
+import lib_nbt
+from minescript_plus import Util
+
+snbt: str = '{Brain: {memories: {"minecraft:job_site": {value: {pos: [I; 9, -60, 17],dimension: "minecraft:overworld"}}}}'
+nbt: dict = lib_nbt.parse_snbt(snbt.replace("I;", ""))
+value = Util.get_nbt(nbt, "Brain.memories.minecraft:job_site.value")
+print(value) # Prints: {'pos': [9, -60, 17], 'dimension': 'minecraft:overworld'}
+print(value.get("pos")) # Prints: [9, -60, 17]
+print(Util.get_nbt(value, "dimension", "default value")) # Prints: minecraft:overworld
+print(Util.get_nbt(value, "non_existant_key", "default value")) # Prints: default value
+```
+
+- **get_light_level(block_pos=None, source: str="RAW") -> int**  
+  Returns the light level at a specified block position in the Minecraft world.  
+  - `block_pos`: The position to check (defaults to the player's current block position).  
+  - `source`: `"RAW"` for raw brightness, `"SKY"` for sky light, or `"BLOCK"` for block light.  
+  *Returns:* The light level as an integer.
+
+**Example:**
+```python
+from minescript_plus import Util
+
+raw = Util.get_light_level(source="RAW")
+sky = Util.get_light_level(source="SKY")
+block = Util.get_light_level(source="BLOCK")
+print(f"Client Light: {raw} ({sky} sky, {block} block)")
+```
+
+- **play_sound(sound=None) -> None**  
+  Plays a sound client-side.  
+  - `sound`: A sound from the `SoundEvents` class. If `None`, plays the experience orb pickup sound.
+
+**Example:**
+```python
+from minescript_plus import Util
+
+Util.play_sound() # Experience orb pickup "ding" sound
+Util.play_sound(Util.get_soundevents().PLAYER_LEVELUP)
+```
+
+- **get_soundevents()**  
+  Returns the `SoundEvents` class from Minecraft, which can be used to get a sound for the `play_sound()` method.  
+  See all available sounds [here](https://mappings.dev/1.21.8/net/minecraft/sounds/SoundEvents.html).
 
 ---
 

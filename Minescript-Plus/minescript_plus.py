@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.13.2-alpha
+    Version: 0.14.0-alpha
     Author: RazrCraft
-    Date: 2025-09-07
+    Date: 2025-09-23
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -31,7 +31,7 @@ import lib_nbt
 
 set_default_executor(script_loop)
 
-_ver: str = "0.13.2-alpha"
+_ver: str = "0.14.0-alpha"
 _intermediary_mc_ver = "1.21.8"
 
 if __name__ == "__main__":
@@ -261,6 +261,7 @@ class Keybind:
 
 Array = JavaClass("java.lang.reflect.Array")
 Clazz = JavaClass("java.lang.Class")
+Float = JavaClass("java.lang.Float")
 Minescript = JavaClass("net.minescript.common.Minescript")
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
 ClickType = JavaClass("net.minecraft.world.inventory.ClickType")
@@ -269,6 +270,9 @@ KeyMapping = JavaClass("net.minecraft.client.KeyMapping")
 InputConstants = JavaClass("com.mojang.blaze3d.platform.InputConstants")
 Difficulty = JavaClass("net.minecraft.world.Difficulty")
 BlockPos = JavaClass("net.minecraft.core.BlockPos")
+SoundEvents = JavaClass("net.minecraft.sounds.SoundEvents")
+SoundSource = JavaClass("net.minecraft.sounds.SoundSource")
+LightLayer = JavaClass("net.minecraft.world.level.LightLayer")
 
 mappings = Minescript.mappingsLoader.get()
 mc = Minecraft.getInstance()
@@ -709,6 +713,12 @@ class Client:
 
     @staticmethod
     def is_multiplayer_server() -> bool:
+        """
+        Determines whether the current Minecraft instance is connected to a multiplayer server.
+
+        Returns:
+            bool: True if connected to a multiplayer server, False otherwise.
+        """
         if fabric:
             return _call_private_method(mc, "method_31321") # type: ignore
         return _call_private_method(mc, "isMultiplayerServer") # type: ignore
@@ -815,11 +825,23 @@ class Player:
 
     @staticmethod
     def get_food_level() -> float:
+        """
+        Retrieves the player's current food level.
+
+        Returns:
+            float: The current food level of the player.
+        """
         foodStats = mc.player.getFoodData()
         return foodStats.getFoodLevel() # type: ignore
     
     @staticmethod
     def get_saturation_level() -> float:
+        """
+        Retrieves the player's current saturation level.
+
+        Returns:
+            float: The current saturation level of the player.
+        """
         foodStats = mc.player.getFoodData()
         return foodStats.getSaturationLevel().value # type: ignore
 
@@ -1094,8 +1116,8 @@ class Trading:
         
         item_stack = offer.getCostA()
         if name_and_count:
-            return (item_stack.getItem().getName().getString(), item_stack.getCount())
-        return item_stack
+            return (item_stack.getItem().getName().getString(), item_stack.getCount()) # type: ignore
+        return item_stack # type: ignore
     
     @staticmethod
     def get_costB(offer_index: int, name_and_count: bool=False) -> tuple[str, int] | ItemStack | None:
@@ -1113,8 +1135,8 @@ class Trading:
         
         item_stack = offer.getCostB()
         if name_and_count:
-            return (item_stack.getItem().getName().getString(), item_stack.getCount())
-        return item_stack
+            return (item_stack.getItem().getName().getString(), item_stack.getCount()) # type: ignore
+        return item_stack # type: ignore
     
     @staticmethod
     def get_result(offer_index: int, name_and_count: bool=False) -> tuple[str, int] | ItemStack | None:
@@ -1132,8 +1154,8 @@ class Trading:
         
         item_stack = offer.getResult()
         if name_and_count:
-            return (item_stack.getItem().getName().getString(), item_stack.getCount())
-        return item_stack
+            return (item_stack.getItem().getName().getString(), item_stack.getCount()) # type: ignore
+        return item_stack # type: ignore
     
     @staticmethod
     def trade_offer(offer_index: int):
@@ -1209,6 +1231,88 @@ class Util:
         dz = pos1[2] - pos2[2]
 
         return (dx**2 + dy**2 + dz**2)**0.5
+    
+    @staticmethod
+    def get_nbt(obj: dict, path: str, default=None) -> Any:
+        """
+        Get a value from nested SNBT data using dot notation.
+        
+        Args:
+            obj: Parsed SNBT object (dictionary)
+            path: Dot-separated path (e.g., "Inventory.0.id")
+            default: Default value if path not found
+            
+        Returns:
+            Any: Value at the specified path or default
+        """
+        if not isinstance(obj, dict):
+            return default
+        
+        current = obj
+        parts = path.split('.')
+        
+        for part in parts:
+            if isinstance(current, dict):
+                if part in current:
+                    current = current[part]
+                else:
+                    return default
+            elif isinstance(current, list):
+                try:
+                    index = int(part)
+                    if 0 <= index < len(current):
+                        current = current[index]
+                    else:
+                        return default
+                except ValueError:
+                    return default
+            else:
+                return default
+        
+        return current
+        
+    @staticmethod
+    def get_light_level(block_pos=None, source: str="RAW") -> int: # type: ignore
+        """
+        Returns the light level at a specified block position in the Minecraft world.
+
+        Args:
+            block_pos (BlockPos, optional): The position of the block to check. If None, uses the player's current block position.
+            source (str, optional): The type of light to retrieve. Can be "RAW" for raw brightness, "SKY" for sky light, or "BLOCK" for block light. Defaults to "RAW".
+
+        Returns:
+            int: The light level at the specified block position according to the selected source.
+        """
+        if block_pos is None:
+            block_pos = mc.player.blockPosition()
+        match source:
+            case "RAW":
+                return mc.level.getChunkSource().getLightEngine().getRawBrightness(block_pos, 0) # type: ignore
+            case "SKY":
+                return mc.level.getBrightness(LightLayer.SKY, block_pos) # type: ignore
+            case "BLOCK":
+                return mc.level.getBrightness(LightLayer.BLOCK, block_pos) # type: ignore
+    
+    @staticmethod
+    def play_sound(sound=None):
+        """
+        Play a sound client side.
+        Args:
+            sound (optional): A sound from sound from SoundEvents class.
+                If None, EXPERIENCE_ORB_PICKUP is played.
+        """
+        if sound is None:
+            sound = SoundEvents.EXPERIENCE_ORB_PICKUP
+        mc.level.playLocalSound(mc.player, sound, SoundSource.PLAYERS, Float(1.0), Float(1.0))
+
+    @staticmethod
+    def get_soundevents():
+        """
+        Returns SoundEvents class frmo Minecraft to get a sound for Util.play_sound() method.
+        
+        All sounds from this class here: https://mappings.dev/1.21.8/net/minecraft/sounds/SoundEvents.html
+        """
+        return SoundEvents
 
 # # # HUD # # #
 
