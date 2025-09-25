@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.14.0-alpha  
+**Version:** 0.14.1-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-09-23
+**Date:** 2025-09-25
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.
@@ -16,7 +16,7 @@ This module should be imported by other scripts and not run directly.
 * Minescript 5.0b6 or newer
 * Python 3.10 or higher
 * java module (already included with Minescript)
-* Mappings (if you use Fabric, more info [`here`](https://minescript.net/mappings))
+* Mappings (if you use Fabric, in chat: `\install_mappings` - More info [`here`](https://minescript.net/mappings))
 * Fabric API mod (optional, for `Hud` class only) 
 * [`lib_nbt v1`](https://minescript.net/sdm_downloads/lib_nbt-v1/) (optional, for `Inventory.find_item()` only)
 
@@ -444,8 +444,13 @@ print(f"Client Light: {raw} ({sky} sky, {block} block)")
 ```
 
 - **play_sound(sound=None) -> None**  
-  Plays a sound client-side.  
-  - `sound`: A sound from the `SoundEvents` class. If `None`, plays the experience orb pickup sound.
+  Plays a sound on the client side.  
+  - `sound` (optional): The sound event to play. Should be an instance from the `SoundEvents` class.
+                Defaults to `EXPERIENCE_ORB_PICKUP` if None is provided.
+  - `sound_source` (optional): The source of the sound. Should be an instance from the `SoundSource` class.
+                Defaults to `PLAYERS` if None is provided.
+  - `volume` (float, optional): The volume of the sound, clamped between `0.0` and `1.0`. Defaults to `1.0`.
+  - `pitch` (float, optional): The pitch of the sound, clamped between `0.0` and `2.0`. Defaults to `1.0`.
 
 **Example:**
 ```python
@@ -458,6 +463,10 @@ Util.play_sound(Util.get_soundevents().PLAYER_LEVELUP)
 - **get_soundevents()**  
   Returns the `SoundEvents` class from Minecraft, which can be used to get a sound for the `play_sound()` method.  
   See all available sounds [here](https://mappings.dev/1.21.8/net/minecraft/sounds/SoundEvents.html).
+
+- **get_soundsource()**  
+  Returns the `SoundSource` class from Minecraft, which can be used to get a sound_source for the `play_sound()` method.  
+  See all available sound_sources [here](https://mappings.dev/1.21.8/net/minecraft/sounds/SoundSource.html).
 
 ---
 

@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.14.0-alpha
+    Version: 0.14.1-alpha
     Author: RazrCraft
-    Date: 2025-09-23
+    Date: 2025-09-25
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -17,25 +17,38 @@
 """
 import asyncio
 import threading
-from sys import exit, stderr # pylint: disable=W0622
+from os import path
+from sys import exit, stderr, version # pylint: disable=W0622
 from time import sleep
 from typing import Callable, Literal, Any
 from dataclasses import dataclass, asdict
 from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock,
                         player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name,
-                        job_info, container_get_items, player_position, entities)
+                        job_info, container_get_items, player_position, entities, echo_json)
 from minescript import VersionInfo as VF
 from minescript import version_info as ver_info
 from java import JavaClass, eval_pyjinn_script
-import lib_nbt
+
+lib_nbt_module: bool = True
+try:
+    import lib_nbt
+except ModuleNotFoundError:
+    lib_nbt_module = False
 
 set_default_executor(script_loop)
 
-_ver: str = "0.14.0-alpha"
-_intermediary_mc_ver = "1.21.8"
+_ver: str = "0.14.1-alpha"
 
 if __name__ == "__main__":
-    print(f"Minescript Plus v{_ver} ({_intermediary_mc_ver})\n\nDon't run it, it's a module, you should import it in your scripts.")
+    print(f"Minescript Plus v{_ver}\n\nDon't run it, it's a module, you should import it in your scripts.")
+    exit(1)
+
+_mc_ver = ver_info().minecraft
+_map_path1 = f"minescript/system/mappings/{_mc_ver}/{_mc_ver}.tiny"
+_map_path2 = f"minescript/system/mappings/{_mc_ver}/client.txt"
+
+if not path.exists(_map_path1) or not path.exists(_map_path2):
+    print("Error: No mappings found. Use this in chat first: \\install_mappings")
     exit(1)
 
 fabric = ver_info().minecraft_class_name == "net.minecraft.class_310"
@@ -43,9 +56,11 @@ fabric = ver_info().minecraft_class_name == "net.minecraft.class_310"
 @dataclass
 class VersionInfo(VF):
     minescript_plus: str
+    python_version: str
+    mappings_installed: bool
 
 def version_info():    
-    print(VersionInfo(**asdict(ver_info()), minescript_plus=_ver), file=stderr)
+    print(VersionInfo(**asdict(ver_info()), minescript_plus=_ver, python_version=version, mappings_installed=True), file=stderr)
 
 EventMode = Literal["flag", "callback"]
 EventName = Literal["on_title", "on_subtitle", "on_actionbar", "on_open_screen"]
@@ -453,6 +468,17 @@ class Inventory:
                 then the hotbar slots IDs will be from 0+54=54 to 8+54=62, and the main inventory will be from 9+54=63 
                 to 35+54=89.
         """
+        if not lib_nbt_module:
+            print("Error: lib_nbt module not found.")
+            echo_json([
+                    {"text":"You can "},
+                    {"text":"download it from here","underlined":True,"color":"#224488","click_event":{"action":"open_url","url":"https://minescript.net/sdm_downloads/lib_nbt-v1"},"hover_event":{"action":"show_text","value":"https://minescript.net/sdm_downloads/lib_nbt-v1"}},
+                    {"text":", and put it in the "},
+                    {"text":"/minescript","bold":True},
+                    {"text":" folder."}
+            ])
+            return
+            
         if not container:
             items: list[ItemStack] = player_inventory()
         else:
@@ -1294,16 +1320,24 @@ class Util:
                 return mc.level.getBrightness(LightLayer.BLOCK, block_pos) # type: ignore
     
     @staticmethod
-    def play_sound(sound=None):
+    def play_sound(sound=None, sound_source=None, volume: float=1.0, pitch: float=1.0):
         """
-        Play a sound client side.
-        Args:
-            sound (optional): A sound from sound from SoundEvents class.
-                If None, EXPERIENCE_ORB_PICKUP is played.
+        Plays a sound on the client side.
+
+            sound (optional): The sound event to play. Should be an instance from the SoundEvents class.
+                Defaults to EXPERIENCE_ORB_PICKUP if None is provided.
+            sound_source (optional): The source of the sound. Should be an instance from the SoundSource class.
+                Defaults to PLAYERS if None is provided.
+            volume (float, optional): The volume of the sound, clamped between 0.0 and 1.0. Defaults to 1.0.
+            pitch (float, optional): The pitch of the sound, clamped between 0.0 and 2.0. Defaults to 1.0.
         """
         if sound is None:
             sound = SoundEvents.EXPERIENCE_ORB_PICKUP
-        mc.level.playLocalSound(mc.player, sound, SoundSource.PLAYERS, Float(1.0), Float(1.0))
+        if sound_source is None:
+            sound_source = SoundSource.PLAYERS
+        volume = max(min(volume, 1), 0)
+        pitch = max(min(pitch, 2), 0)
+        mc.level.playLocalSound(mc.player, sound, sound_source, Float(volume), Float(pitch))
 
     @staticmethod
     def get_soundevents():
@@ -1313,6 +1347,15 @@ class Util:
         All sounds from this class here: https://mappings.dev/1.21.8/net/minecraft/sounds/SoundEvents.html
         """
         return SoundEvents
+
+    @staticmethod
+    def get_soundsource():
+        """
+        Returns SoundSource class frmo Minecraft to get a sound_source for Util.play_sound() method.
+        
+        All sounds from this class here: https://mappings.dev/1.21.8/net/minecraft/sounds/SoundSource.html
+        """
+        return SoundSource
 
 # # # HUD # # #
 
