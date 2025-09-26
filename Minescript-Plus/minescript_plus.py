@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.14.1-alpha
+    Version: 0.14.2-alpha
     Author: RazrCraft
-    Date: 2025-09-25
+    Date: 2025-09-26
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -37,7 +37,7 @@ except ModuleNotFoundError:
 
 set_default_executor(script_loop)
 
-_ver: str = "0.14.1-alpha"
+_ver: str = "0.14.2-alpha"
 
 if __name__ == "__main__":
     print(f"Minescript Plus v{_ver}\n\nDon't run it, it's a module, you should import it in your scripts.")
@@ -332,6 +332,11 @@ def _set_grab_mouse():
     field = c.getDeclaredField(f)
     field.setAccessible(True)
     field.setBoolean(clazz, True)
+
+def _check_fabric(clazz: str):
+    if not fabric:
+        print(f"Error: {clazz} class is only supported on Fabric")
+        exit(1)
     
 # # # INVENTORY # # #
 
@@ -1358,8 +1363,8 @@ class Util:
         return SoundSource
 
 # # # HUD # # #
-
-pyj_hud = eval_pyjinn_script(r"""
+if fabric:
+    pyj_hud = eval_pyjinn_script(r"""
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
 HudRenderCallback = JavaClass("net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback")
 ARGB = JavaClass("net.minecraft.util.ARGB")
@@ -1540,28 +1545,26 @@ def on_hud_render(guiGraphics, tickDeltaManager):
 callback = ManagedCallback(on_hud_render)
 HudRenderCallback.EVENT.register(HudRenderCallback(callback))
 
-# Cancel after 1 second (1000 milliseconds):
-#set_timeout(callback.cancel, 5000)
-""")
+    """)
 
-_add_text = pyj_hud.getFunction("_add_text")
-_set_text = pyj_hud.getFunction("_set_text")
-_remove_text = pyj_hud.getFunction("_remove_text")
-_clear_texts = pyj_hud.getFunction("_clear_texts")
-_get_texts = pyj_hud.getFunction("_get_texts")
-_show_hud = pyj_hud.getFunction("_show_hud")
-_show_text = pyj_hud.getFunction("_show_text")
-_use_toggle_key = pyj_hud.getFunction("_use_toggle_key")
-_set_toggle_key = pyj_hud.getFunction("_set_toggle_key")
-_get_item_from_itemid = pyj_hud.getFunction("_get_item_from_itemid")
-_get_item_name = pyj_hud.getFunction("_get_item_name")
-_add_item = pyj_hud.getFunction("_add_item")
-_remove_item = pyj_hud.getFunction("_remove_item")
-_clear_items = pyj_hud.getFunction("_clear_items")
-_get_items = pyj_hud.getFunction("_get_items")
-_show_item = pyj_hud.getFunction("_show_item")
+    _add_text = pyj_hud.getFunction("_add_text")
+    _set_text = pyj_hud.getFunction("_set_text")
+    _remove_text = pyj_hud.getFunction("_remove_text")
+    _clear_texts = pyj_hud.getFunction("_clear_texts")
+    _get_texts = pyj_hud.getFunction("_get_texts")
+    _show_hud = pyj_hud.getFunction("_show_hud")
+    _show_text = pyj_hud.getFunction("_show_text")
+    _use_toggle_key = pyj_hud.getFunction("_use_toggle_key")
+    _set_toggle_key = pyj_hud.getFunction("_set_toggle_key")
+    _get_item_from_itemid = pyj_hud.getFunction("_get_item_from_itemid")
+    _get_item_name = pyj_hud.getFunction("_get_item_name")
+    _add_item = pyj_hud.getFunction("_add_item")
+    _remove_item = pyj_hud.getFunction("_remove_item")
+    _clear_items = pyj_hud.getFunction("_clear_items")
+    _get_items = pyj_hud.getFunction("_get_items")
+    _show_item = pyj_hud.getFunction("_show_item")
 
-class Hud:
+class Hud:    
     @staticmethod
     def add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
         shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False) -> int:
@@ -1578,6 +1581,7 @@ class Hud:
         Returns:
             int: Index of the added text.
         """
+        _check_fabric("Hud")
         return _add_text(True, text, x, y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated) # type: ignore
 
     @staticmethod
@@ -1588,6 +1592,7 @@ class Hud:
             index (int): Index of the text to change.
             text (str): New text
         """
+        _check_fabric("Hud")
         _set_text(index, text)
         
     @staticmethod
@@ -1597,6 +1602,7 @@ class Hud:
         Args:
             index (int): Index of the text to remove.
         """
+        _check_fabric("Hud")
         _remove_text(index)
     
     @staticmethod
@@ -1604,6 +1610,7 @@ class Hud:
         """
         Removes all texts entries from the HUD.
         """
+        _check_fabric("Hud")
         _clear_texts()
     
     @staticmethod
@@ -1613,6 +1620,7 @@ class Hud:
         Returns:
             dict: Mapping of index to text properties.
         """
+        _check_fabric("Hud")
         return _get_texts() # type: ignore
 
     @staticmethod
@@ -1622,6 +1630,7 @@ class Hud:
         Args:
             enable (bool): True to show, False to hide.
         """
+        _check_fabric("Hud")
         _show_hud(enable)
 
     @staticmethod
@@ -1632,6 +1641,7 @@ class Hud:
             index (int): Index of the text.
             enable (bool): True to show, False to hide.
         """
+        _check_fabric("Hud")
         _show_text(index, enable)
 
     @staticmethod
@@ -1641,6 +1651,7 @@ class Hud:
         Args:
             enable (bool): True to allow toggling HUD with key.
         """
+        _check_fabric("Hud")
         _use_toggle_key(enable)
 
     @staticmethod
@@ -1650,6 +1661,7 @@ class Hud:
         Args:
             toggle_key (int): GLFW key code to use for toggling.
         """
+        _check_fabric("Hud")
         _set_toggle_key(toggle_key)
 
     @staticmethod
@@ -1661,6 +1673,7 @@ class Hud:
         Returns:
             Item: The item object.
         """
+        _check_fabric("Hud")
         return _get_item_from_itemid(item_id)
     
     @staticmethod
@@ -1672,6 +1685,7 @@ class Hud:
         Returns:
             str: The item ID.
         """
+        _check_fabric("Hud")
         return block_type.split(r"\[")[0]
     
     @staticmethod
@@ -1683,6 +1697,7 @@ class Hud:
         Returns:
             str: The item name.
         """
+        _check_fabric("Hud")
         return _get_item_name(item) # type: ignore
     
     @staticmethod
@@ -1698,6 +1713,7 @@ class Hud:
         Returns:
             int: Index of the added item.
         """
+        _check_fabric("Hud")
         return _add_item(True, item_id, x, y, count, scale) # type: ignore
         
     @staticmethod
@@ -1707,6 +1723,7 @@ class Hud:
         Args:
             index (int): Index of the item to remove.
         """
+        _check_fabric("Hud")
         _remove_item(index)
     
     @staticmethod
@@ -1714,6 +1731,7 @@ class Hud:
         """
         Removes all items entries from the HUD.
         """
+        _check_fabric("Hud")
         _clear_items()
         
     @staticmethod
@@ -1723,6 +1741,7 @@ class Hud:
         Returns:
             dict: Mapping of index to item properties.
         """
+        _check_fabric("Hud")
         return _get_items() # type: ignore
 
     @staticmethod
@@ -1733,4 +1752,5 @@ class Hud:
             index (int): Index of the item.
             enable (bool): True to show, False to hide.
         """
+        _check_fabric("Hud")
         _show_item(index, enable)
