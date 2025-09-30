@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.14.2-alpha
+    Version: 0.14.3-alpha
     Author: RazrCraft
-    Date: 2025-09-26
+    Date: 2025-09-29
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -37,7 +37,7 @@ except ModuleNotFoundError:
 
 set_default_executor(script_loop)
 
-_ver: str = "0.14.2-alpha"
+_ver: str = "0.14.3-alpha"
 
 if __name__ == "__main__":
     print(f"Minescript Plus v{_ver}\n\nDon't run it, it's a module, you should import it in your scripts.")
@@ -305,7 +305,7 @@ QUICK_MOVE      Performs a shift-click.
 SWAP            Exchanges items between a slot and a hotbar slot.
 THROW           Throws the item out of the inventory.
 """
-
+    
 def _get_private_field(clazz, field_name, super_class: bool=False): # type: ignore
     if super_class:
         c = clazz.getClass().getSuperclass()
@@ -1387,6 +1387,23 @@ _ti: int = 0
 _items: dict[int, tuple[bool, str, int, int, str, float]] = {}
 _ii: int = 0
 
+def _check_ver(ver: str) -> bool:
+    _mc_ver = version_info().minecraft
+    mc_version = [int(v) for v in _mc_ver.split(".")]
+    ver = [int(v) for v in ver.split(".")]
+    check = True
+    for i in range(3):
+        check = check and mc_version[i] >= ver[i]
+    return check
+
+def Float(number):
+    return number.floatValue()
+
+def render_item_count(gui_graphics, font, item_stack, scaled_X, scaled_Y, count):
+    if item_stack.getCount() != 1 or count is not None:
+        string2 = count if count is not None else str(item_stack.getCount())
+        gui_graphics.drawString(font, string2, scaled_X + 19 - 2 - font.width(string2), scaled_Y + 6 + 3, -1, True)
+
 def _add_text(*t):
     global _texts
     global _ti
@@ -1510,25 +1527,36 @@ def on_hud_render(guiGraphics, tickDeltaManager):
                 styled_text = styled_text.withStyle(ChatFormatting.OBFUSCATED)
             color: int = ARGB.color(alpha, r, g, b)
             
+            scale = scale.floatValue()
             pose_stack = guiGraphics.pose()
-            pose_stack.pushMatrix()
-            scale = float(scale)
-            pose_stack.scale(scale, scale)
+            if _check_ver("1.21.6"):
+                pose_stack.pushMatrix()
+                pose_stack.scale(scale, scale)
+            else:
+                pose_stack.pushPose()
+                pose_stack.scale(scale, scale, 0)
             scaled_X: int = int(x / scale)
             scaled_Y: int = int(y / scale)
             
             guiGraphics.drawString(mc.font, styled_text, scaled_X, scaled_Y, color, shadow)
             
-            pose_stack.popMatrix()
+            if _check_ver("1.21.6"):
+                pose_stack.popMatrix()
+            else:
+                pose_stack.popPose()
     
     for i in _items:
         state, item_id, x, y, count, scale = _items[i]
         
         if state:
+            scale = scale.floatValue()
             pose_stack = guiGraphics.pose()
-            pose_stack.pushMatrix()
-            scale = float(scale)
-            pose_stack.scale(scale, scale)
+            if _check_ver("1.21.6"):
+                pose_stack.pushMatrix()
+                pose_stack.scale(scale, scale)
+            else:
+                pose_stack.pushPose()
+                pose_stack.scale(scale, scale, 0)
             scaled_X: int = int(x / scale)
             scaled_Y: int = int(y / scale)
             
@@ -1537,9 +1565,12 @@ def on_hud_render(guiGraphics, tickDeltaManager):
             
             guiGraphics.renderItem(item_stack, scaled_X, scaled_Y)
             if count != "":
-                guiGraphics.renderItemCount(mc.font, item_stack, scaled_X, scaled_Y, count)
+                render_item_count(guiGraphics, mc.font, item_stack, scaled_X, scaled_Y, count)
             
-            pose_stack.popMatrix()
+            if _check_ver("1.21.6"):
+                pose_stack.popMatrix()
+            else:
+                pose_stack.popPose()
 
 
 callback = ManagedCallback(on_hud_render)

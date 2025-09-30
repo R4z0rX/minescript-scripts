@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.14.1-alpha  
+**Version:** 0.14.3-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-09-25
+**Date:** 2025-09-29
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.
@@ -458,6 +458,7 @@ from minescript_plus import Util
 
 Util.play_sound() # Experience orb pickup "ding" sound
 Util.play_sound(Util.get_soundevents().PLAYER_LEVELUP)
+Util.play_sound(Util.get_soundevents().BELL_BLOCK, Util.get_soundsource().BLOCKS)
 ```
 
 - **get_soundevents()**  
