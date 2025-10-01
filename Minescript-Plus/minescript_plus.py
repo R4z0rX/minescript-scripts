@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.14.3-alpha
+    Version: 0.15.0-alpha
     Author: RazrCraft
-    Date: 2025-09-29
+    Date: 2025-09-30
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -20,6 +20,7 @@ import threading
 from os import path
 from sys import exit, stderr, version # pylint: disable=W0622
 from time import sleep
+from math import floor
 from typing import Callable, Literal, Any
 from dataclasses import dataclass, asdict
 from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock,
@@ -37,7 +38,7 @@ except ModuleNotFoundError:
 
 set_default_executor(script_loop)
 
-_ver: str = "0.14.3-alpha"
+_ver: str = "0.15.0-alpha"
 
 if __name__ == "__main__":
     print(f"Minescript Plus v{_ver}\n\nDon't run it, it's a module, you should import it in your scripts.")
@@ -875,6 +876,20 @@ class Player:
         """
         foodStats = mc.player.getFoodData()
         return foodStats.getSaturationLevel().value # type: ignore
+    
+    @staticmethod
+    def get_player_block_position() -> list[int]:
+        """
+        Returns the player's current block position as a list of integers.
+
+        This function retrieves the player's current position in the game world,
+        rounds down each coordinate to the nearest integer using floor, and returns
+        the resulting block-aligned position as a list.
+
+        Returns:
+            list of int: The [x, y, z] coordinates of the player's block position.
+        """
+        return [floor(p) for p in player_position()]
 
 # # # SERVER # # #
 
@@ -1404,6 +1419,9 @@ def render_item_count(gui_graphics, font, item_stack, scaled_X, scaled_Y, count)
         string2 = count if count is not None else str(item_stack.getCount())
         gui_graphics.drawString(font, string2, scaled_X + 19 - 2 - font.width(string2), scaled_Y + 6 + 3, -1, True)
 
+def combine(*values):
+  return values
+
 def _add_text(*t):
     global _texts
     global _ti
@@ -1412,13 +1430,29 @@ def _add_text(*t):
     _ti += 1
     return _ti - 1
 
-def _set_text(index: int, text: str):
+def _update_text(index: int, *t):
+    global _texts
+    
+    _texts[index] = tuple(t)
+
+def _get_text_string(index: int):
+    return _texts[index][1]
+    
+def _set_text_string(index: int, text: str):
     global _texts
     
     old = _texts[index]
-    a, _, c, d, e, f, g, h, i, j, k, l, m, n = old
-    _texts[index] = (a, text, c, d, e, f, g, h, i, j, k, l, m, n)
+    _texts[index] = combine(old[0], text, *old[2:])
 
+def _get_text_position(index: int):
+    return (_texts[index][2], _texts[index][3])
+
+def _set_text_position(index: int, x: int, y: int):
+    global _texts
+    
+    old = _texts[index]
+    _texts[index] = combine(*old[:2], x, y, *old[4:])
+    
 def _remove_text(i):
     global _texts
     global _ti
@@ -1443,9 +1477,7 @@ def _show_text(index: int, enable: bool):
     global _texts
     
     old = _texts[index]
-    #_texts[index] = (enable, *old[1:])
-    a, b, c, d, e, f, g, h, i, j, k, l, m = old[1:]
-    _texts[index] = (enable, a, b, c, d, e, f, g, h, i, j, k, l, m)
+    _texts[index] = combine(enable, *old[1:])
 
 def on_press_key(event):
     global show
@@ -1483,6 +1515,38 @@ def _add_item(*t):
     _ii += 1
     return _ii - 1
 
+def _update_item(index: int, *t):
+    global _items
+    
+    _items[index] = tuple(t)
+
+def _get_item_string(index: int):
+    return _items[index][1]
+    
+def _set_item_string(index: int, text: str):
+    global _items
+    
+    old = _items[index]
+    _items[index] = combine(old[0], text, *old[2:])
+
+def _get_item_position(index: int):
+    return (_items[index][2], _items[index][3])
+
+def _set_item_position(index: int, x: int, y: int):
+    global _item
+    
+    old = _items[index]
+    _items[index] = combine(*old[:2], x, y, *old[4:])
+
+def _get_item_count(index: int):
+    return _items[index][4]
+
+def _set_item_count(index: int, count: str):
+    global _item
+    
+    old = _items[index]
+    _items[index] = combine(*old[:4], count, *old[5:])
+        
 def _remove_item(i):
     global _items
     global _ti
@@ -1503,8 +1567,9 @@ def _show_item(index: int, enable: bool):
     
     old = _items[index]
     #_items[index] = (enable, *old[1:])
-    a, b, c, d, e = old[1:]
-    _items[index] = (enable, a, b, c, d, e)
+    #a, b, c, d, e = old[1:]
+    #_items[index] = (enable, a, b, c, d, e)
+    _items[index] = combine(enable, *old[1:])
     
 def on_hud_render(guiGraphics, tickDeltaManager):
     global frames
@@ -1513,6 +1578,7 @@ def on_hud_render(guiGraphics, tickDeltaManager):
         return
     
     for t in _texts:
+        # _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool]]
         state, text, x, y, r, g, b, alpha, scale, shadow, italic, underline, strikethrough, obfsucated = _texts[t]
         
         if state:
@@ -1578,22 +1644,33 @@ HudRenderCallback.EVENT.register(HudRenderCallback(callback))
 
     """)
 
-    _add_text = pyj_hud.getFunction("_add_text")
-    _set_text = pyj_hud.getFunction("_set_text")
-    _remove_text = pyj_hud.getFunction("_remove_text")
-    _clear_texts = pyj_hud.getFunction("_clear_texts")
-    _get_texts = pyj_hud.getFunction("_get_texts")
-    _show_hud = pyj_hud.getFunction("_show_hud")
-    _show_text = pyj_hud.getFunction("_show_text")
-    _use_toggle_key = pyj_hud.getFunction("_use_toggle_key")
-    _set_toggle_key = pyj_hud.getFunction("_set_toggle_key")
-    _get_item_from_itemid = pyj_hud.getFunction("_get_item_from_itemid")
-    _get_item_name = pyj_hud.getFunction("_get_item_name")
-    _add_item = pyj_hud.getFunction("_add_item")
-    _remove_item = pyj_hud.getFunction("_remove_item")
-    _clear_items = pyj_hud.getFunction("_clear_items")
-    _get_items = pyj_hud.getFunction("_get_items")
-    _show_item = pyj_hud.getFunction("_show_item")
+    _add_text = pyj_hud.get("_add_text")
+    _update_text = pyj_hud.get("_update_text")
+    _get_text_string = pyj_hud.get("_get_text_string")
+    _set_text_string = pyj_hud.get("_set_text_string")
+    _get_text_position = pyj_hud.get("_get_text_position")
+    _set_text_position = pyj_hud.get("_set_text_position")
+    _remove_text = pyj_hud.get("_remove_text")
+    _clear_texts = pyj_hud.get("_clear_texts")
+    _get_texts = pyj_hud.get("_get_texts")
+    _show_hud = pyj_hud.get("_show_hud")
+    _show_text = pyj_hud.get("_show_text")
+    _use_toggle_key = pyj_hud.get("_use_toggle_key")
+    _set_toggle_key = pyj_hud.get("_set_toggle_key")
+    _get_item_from_itemid = pyj_hud.get("_get_item_from_itemid")
+    _get_item_name = pyj_hud.get("_get_item_name")
+    _add_item = pyj_hud.get("_add_item")
+    _update_item = pyj_hud.get("_update_item")
+    _get_item_string = pyj_hud.get("_get_item_string")
+    _set_item_string = pyj_hud.get("_set_item_string")
+    _get_item_position = pyj_hud.get("_get_item_position")
+    _set_item_position = pyj_hud.get("_set_item_position")
+    _get_item_count = pyj_hud.get("_get_item_count")
+    _set_item_count = pyj_hud.get("_set_item_count")
+    _remove_item = pyj_hud.get("_remove_item")
+    _clear_items = pyj_hud.get("_clear_items")
+    _get_items = pyj_hud.get("_get_items")
+    _show_item = pyj_hud.get("_show_item")
 
 class Hud:    
     @staticmethod
@@ -1616,7 +1693,39 @@ class Hud:
         return _add_text(True, text, x, y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated) # type: ignore
 
     @staticmethod
-    def set_text(index: int, text: str):
+    def update_text(index: int, text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
+        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False):
+        """
+        Updates a text string to the Minecraft HUD at the specified position.
+        Args:
+            index (int): Index of the text to update.
+            text (str): The text to display.
+            x (int): X position on screen.
+            y (int): Y position on screen.
+            color (tuple, optional): RGB color tuple. Default: (255,255,255)
+            alpha (int, optional): Alpha transparency. Default: 255
+            scale (float, optional): Text scale. Default: 1.0
+            shadow, italic, underline, strikethrough, obfsucated (bool, optional): Text effects.
+        Returns:
+            int: Index of the added text.
+        """
+        _check_fabric("Hud")
+        _update_text(index, True, text, x, y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated)
+
+    @staticmethod
+    def get_text_string(index: int) -> str:
+        """
+        Returns the position of an existing entry by its index.
+        Args:
+            index (int): Index of the text to change.
+        Returns:
+            str: Current text.
+        """
+        _check_fabric("Hud")
+        return _get_text_string(index) # type: ignore
+        
+    @staticmethod
+    def set_text_string(index: int, text: str):
         """
         Change the text of an existing entry by its index.
         Args:
@@ -1624,8 +1733,32 @@ class Hud:
             text (str): New text
         """
         _check_fabric("Hud")
-        _set_text(index, text)
+        _set_text_string(index, text)
         
+    @staticmethod
+    def get_text_position(index: int) -> tuple[int, int]:
+        """
+        Returns the position of an existing entry by its index.
+        Args:
+            index (int): Index of the text to change.
+        Returns:
+            tuple: Position in x and y coordinates.
+        """
+        _check_fabric("Hud")
+        return _get_text_position(index) # type: ignore
+        
+    @staticmethod
+    def set_text_position(index: int, x: int, y: int):
+        """
+        Change the position of an existing entry by its index.
+        Args:
+            index (int): Index of the text to change.
+            x (int): X position on screen.
+            y (int): Y position on screen.
+        """
+        _check_fabric("Hud")
+        _set_text_position(index, x, y)
+
     @staticmethod
     def remove_text(index: int):
         """
@@ -1746,7 +1879,92 @@ class Hud:
         """
         _check_fabric("Hud")
         return _add_item(True, item_id, x, y, count, scale) # type: ignore
+    
+    @staticmethod
+    def update_item(index: int, item_id: str, x: int, y: int, count: str="", scale: float=1.0):
+        """
+        Adds an item icon to the HUD at the specified position.
+        Args:
+            index (int): Index of the item to update.
+            item_id (str): The item ID to display.
+            x (int): X position on screen.
+            y (int): Y position on screen.
+            count (str, optional): Text to show as item count. Default: ""
+            scale (float, optional): Icon scale. Default: 1.0
+        """
+        _check_fabric("Hud")
+        _update_item(True, item_id, x, y, count, scale)
+
+    @staticmethod
+    def get_item_string(index: int) -> str:
+        """
+        Returns the position of an existing entry by its index.
+        Args:
+            index (int): Index of the item to change.
+        Returns:
+            str: Current item.
+        """
+        _check_fabric("Hud")
+        return _get_item_string(index) # type: ignore
         
+    @staticmethod
+    def set_item_string(index: int, item: str):
+        """
+        Change the item of an existing entry by its index.
+        Args:
+            index (int): Index of the item to change.
+            item (str): New item
+        """
+        _check_fabric("Hud")
+        _set_item_string(index, item)
+        
+    @staticmethod
+    def get_item_position(index: int) -> tuple[int, int]:
+        """
+        Returns the position of an existing entry by its index.
+        Args:
+            index (int): Index of the item to change.
+        Returns:
+            tuple: Position in x and y coordinates.
+        """
+        _check_fabric("Hud")
+        return _get_item_position(index) # type: ignore
+        
+    @staticmethod
+    def set_item_position(index: int, x: int, y: int):
+        """
+        Change the position of an existing entry by its index.
+        Args:
+            index (int): Index of the item to change.
+            x (int): X position on screen.
+            y (int): Y position on screen.
+        """
+        _check_fabric("Hud")
+        _set_item_position(index, x, y)
+        
+    @staticmethod
+    def get_item_count(index: int) -> int:
+        """
+        Returns the count of an existing entry by its index.
+        Args:
+            index (int): Index of the item to change.
+        Returns:
+            str: Current display count
+        """
+        _check_fabric("Hud")
+        return _get_item_count(index) # type: ignore
+        
+    @staticmethod
+    def set_item_count(index: int, count: str):
+        """
+        Change the count of an existing entry by its index.
+        Args:
+            index (int): Index of the item to change.
+            count (str): Count to display for this item.
+        """
+        _check_fabric("Hud")
+        _set_item_count(index, count)
+
     @staticmethod
     def remove_item(index: int):
         """

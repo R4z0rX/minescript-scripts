@@ -209,6 +209,9 @@ Methods for retrieving player information.
 - **get_saturation_level() -> float**  
   Retrieves the player's saturation level.
 
+- **get_player_block_position() -> list[int]**
+  Returns the player's current block position as a list of integers.
+
 ---
 
 ### [`Server`](Minescript-Plus/minescript_plus.py )
@@ -327,8 +330,20 @@ Methods for rendering custom text and items on the Minecraft HUD (Heads-Up Displ
   Adds a styled text string to the HUD at the specified position.  
   *Returns:* The index of the added text.
 
-- **set_text(index: int, text: str) -> None**  
-  Change the text of an existing entry with the given index.
+- **update_text(index: int, text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False) -> None**  
+  Updates an existing HUD text entry at the given index with new properties.
+
+- **get_text_string(index: int) -> str**  
+  Returns the text string of the HUD entry at the given index.
+
+- **set_text_string(index: int, text: str) -> None**  
+  Sets the text string of the HUD entry at the given index.
+
+- **get_text_position(index: int) -> tuple[int, int]**  
+  Returns the (x, y) position of the HUD text entry at the given index.
+
+- **set_text_position(index: int, x: int, y: int) -> None**  
+  Sets the (x, y) position of the HUD text entry at the given index.
 
 - **remove_text(index: int) -> None**  
   Removes the text with the given index.
@@ -364,6 +379,27 @@ Methods for rendering custom text and items on the Minecraft HUD (Heads-Up Displ
   Adds an item icon to the HUD at the specified position.  
   *Returns:* The index of the added item.
 
+- **update_item(index: int, item_id: str, x: int, y: int, count: str="", scale: float=1.0) -> None**  
+  Updates an existing HUD item entry at the given index with new properties.
+
+- **get_item_string(index: int) -> str**  
+  Returns the item ID string of the HUD item entry at the given index.
+
+- **set_item_string(index: int, item: str) -> None**  
+  Sets the item ID string of the HUD item entry at the given index.
+
+- **get_item_position(index: int) -> tuple[int, int]**  
+  Returns the (x, y) position of the HUD item entry at the given index.
+
+- **set_item_position(index: int, x: int, y: int) -> None**  
+  Sets the (x, y) position of the HUD item entry at the given index.
+
+- **get_item_count(index: int) -> int**  
+  Returns the display count of the HUD item entry at the given index.
+
+- **set_item_count(index: int, count: str) -> None**  
+  Sets the display count of the HUD item entry at the given index.
+
 - **remove_item(index: int) -> None**  
   Removes the item with the given index.
 
@@ -390,6 +426,15 @@ item_id = Hud.add_item("minecraft:diamond", x=50, y=10, count="5", scale=1.2)
 Hud.show_hud(True)
 Hud.show_text(text_id, False)
 Hud.show_item(item_id, True)
+
+# Get and set positions
+x, y = Hud.get_text_position(text_id)
+Hud.set_text_position(text_id, x + 5, y + 10)
+Hud.set_item_position(item_id, 45, 60)
+
+# Item count
+current_count = int(Hud.get_item_count(item_id))
+Hud.set_item_count(item_id, str(current_count + 5))
 ```
 
 ---
