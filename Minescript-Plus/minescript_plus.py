@@ -14,6 +14,8 @@
     
     Note: Some code shared by @maxuser (Minescript's creator) on the 
     official discord was used in this API, mostly in the Inventory class.
+
+    Text and Item Anchoring + Justification by @No
 """
 import asyncio
 import threading
@@ -1397,9 +1399,9 @@ toggle_key = 301  # F12
 tl = None
 frames = 0
 show = True
-_texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool]] = {}
+_texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool,float,float]] = {}
 _ti: int = 0
-_items: dict[int, tuple[bool, str, int, int, str, float]] = {}
+_items: dict[int, tuple[bool, str, int, int, str, float, float, float]] = {}
 _ii: int = 0
 
 def _check_ver(ver: str) -> bool:
@@ -1576,12 +1578,15 @@ def on_hud_render(guiGraphics, tickDeltaManager):
     
     if not show:
         return
-    
+    winx = int(mc.getWindow().getGuiScaledWidth())
+    winy = int(mc.getWindow().getGuiScaledHeight())
     for t in _texts:
-        # _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool]]
-        state, text, x, y, r, g, b, alpha, scale, shadow, italic, underline, strikethrough, obfsucated = _texts[t]
+        # _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool, float, float]]
+        state, text, x, y, r, g, b, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY = _texts[t]
         
         if state:
+            
+            
             styled_text = Component.literal(text)
             if italic:
                 styled_text = styled_text.withStyle(ChatFormatting.ITALIC)
@@ -1601,10 +1606,10 @@ def on_hud_render(guiGraphics, tickDeltaManager):
             else:
                 pose_stack.pushPose()
                 pose_stack.scale(scale, scale, 0)
-            scaled_X: int = int(x / scale)
-            scaled_Y: int = int(y / scale)
+            scaled_X: int = int(((x) / scale)+ (anchorX*winx/scale))
+            scaled_Y: int = int(((y) / scale)+ (anchorY*winy/scale))
             
-            guiGraphics.drawString(mc.font, styled_text, scaled_X, scaled_Y, color, shadow)
+            guiGraphics.drawString(mc.font, styled_text, scaled_X, scaled_Y , color, shadow)
             
             if _check_ver("1.21.6"):
                 pose_stack.popMatrix()
@@ -1612,7 +1617,7 @@ def on_hud_render(guiGraphics, tickDeltaManager):
                 pose_stack.popPose()
     
     for i in _items:
-        state, item_id, x, y, count, scale = _items[i]
+        state, item_id, x, y, count, scale, anchorX, anchorY = _items[i]
         
         if state:
             scale = scale.floatValue()
@@ -1629,9 +1634,9 @@ def on_hud_render(guiGraphics, tickDeltaManager):
             item = _get_item_from_itemid(item_id)
             item_stack = ItemStack(item)
             
-            guiGraphics.renderItem(item_stack, scaled_X, scaled_Y)
+            guiGraphics.renderItem(item_stack, int(scaled_X + (winx*anchorX/scale)), int(scaled_Y + (winy*anchorY/scale)))
             if count != "":
-                render_item_count(guiGraphics, mc.font, item_stack, scaled_X, scaled_Y, count)
+                render_item_count(guiGraphics, mc.font, item_stack, int(scaled_X + (winx*anchorX)), int(scaled_Y + (winy*anchorY)), count)
             
             if _check_ver("1.21.6"):
                 pose_stack.popMatrix()
@@ -1674,8 +1679,8 @@ HudRenderCallback.EVENT.register(HudRenderCallback(callback))
 
 class Hud:    
     @staticmethod
-    def add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
-        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False) -> int:
+    def add_text(text: str="TEXT HERE", x: int=0, y: int=0, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
+        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1) -> int:
         """
         Adds a text string to the Minecraft HUD at the specified position.
         Args:
@@ -1686,15 +1691,19 @@ class Hud:
             alpha (int, optional): Alpha transparency. Default: 255
             scale (float, optional): Text scale. Default: 1.0
             shadow, italic, underline, strikethrough, obfsucated (bool, optional): Text effects.
+            AnchorX, AnchorY: adds a % of the screen to where your text is rendered. (0-1)
+            JustifyX, JustifyY: justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
         Returns:
             int: Index of the added text.
         """
         _check_fabric("Hud")
-        return _add_text(True, text, x, y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated) # type: ignore
+        place_x = int(x - ((justifyX+1)*mc.font.width(text)*scale*.5))
+        place_y = int(y - ((justifyY+1)*mc.font.lineHeight*scale*.4))
+        return _add_text(True, text, place_x, place_y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY) # type: ignore
 
     @staticmethod
-    def update_text(index: int, text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
-        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False):
+    def update_text(index: int, text: str, x: int=0, y: int=0, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
+        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY:float=0, justifyX: float=-1, justifyY: float=-1):
         """
         Updates a text string to the Minecraft HUD at the specified position.
         Args:
@@ -1710,7 +1719,9 @@ class Hud:
             int: Index of the added text.
         """
         _check_fabric("Hud")
-        _update_text(index, True, text, x, y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated)
+        place_x = int(x - ((justifyX+1)*mc.font.width(text)*scale*.5))
+        place_y = int(y - ((justifyY+1)*mc.font.lineHeight*scale*.5))
+        _update_text(index, True, text, place_x, place_y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY)
 
     @staticmethod
     def get_text_string(index: int) -> str:
@@ -1865,7 +1876,7 @@ class Hud:
         return _get_item_name(item) # type: ignore
     
     @staticmethod
-    def add_item(item_id: str, x: int, y: int, count: str="", scale: float=1.0) -> int:
+    def add_item(item_id: str="barrier", x: int=0, y: int=0, count: str="", scale: float=1.0, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1) -> int:
         """
         Adds an item icon to the HUD at the specified position.
         Args:
@@ -1874,14 +1885,18 @@ class Hud:
             y (int): Y position on screen.
             count (str, optional): Text to show as item count. Default: ""
             scale (float, optional): Icon scale. Default: 1.0
+            AnchorX, AnchorY: adds a % of the screen to where your text is rendered. (0-1)
+            JustifyX, JustifyY: justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
         Returns:
             int: Index of the added item.
         """
         _check_fabric("Hud")
-        return _add_item(True, item_id, x, y, count, scale) # type: ignore
+        place_x = int(x - ((justifyX+1)*16*scale/2))
+        place_y = int(y - ((justifyY+1)*16*scale/2))
+        return _add_item(True, item_id, place_x, place_y, count, scale, anchorX, anchorY) # type: ignore
     
     @staticmethod
-    def update_item(index: int, item_id: str, x: int, y: int, count: str="", scale: float=1.0):
+    def update_item(index: int, item_id: str="barrier", x: int=0, y: int=0, count: str="", scale: float=1.0, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1):
         """
         Adds an item icon to the HUD at the specified position.
         Args:
@@ -1891,9 +1906,13 @@ class Hud:
             y (int): Y position on screen.
             count (str, optional): Text to show as item count. Default: ""
             scale (float, optional): Icon scale. Default: 1.0
+            AnchorX, AnchorY: adds a % of the screen to where your text is rendered. (0-1)
+            JustifyX, JustifyY: justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
         """
         _check_fabric("Hud")
-        _update_item(True, item_id, x, y, count, scale)
+        place_x = int(x - ((justifyX+1)*16*scale/2))
+        place_y = int(y - ((justifyY+1)*16*scale/2))
+        _update_item(True, item_id, place_x, place_y, count, scale, anchorX, anchorY)
 
     @staticmethod
     def get_item_string(index: int) -> str:
