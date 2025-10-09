@@ -26,8 +26,10 @@ def add_options(widget, **options):
 ##############################################################################  
 
 class Base:
-    def __init__(self, widget: tk.Widget, *, width: int, height: int, x: int, y: int, **options):
+    def __init__(self, widget: tk.Widget, *, text: tk.Variable | None = None, value: tk.Variable | None = None, width: int, height: int, x: int, y: int, **options):
         self._w = widget
+        self._text = text
+        self._value = value
         self._width = width if width is not None else widget.winfo_reqwidth()
         self._height = height
         self._x = x
@@ -38,6 +40,34 @@ class Base:
     def place(self):
         self._w.place(x=self._x, y=self._y, width=self._width, height=self._height)
 
+    @property
+    def text(self) -> str:
+        if self._text is not None:
+            return str(self._text.get())
+        return self._w.cget("text")
+    @text.setter
+    def text(self, value: str) -> None:
+        if self._text is not None:
+            self._text.set(value)
+        else:
+            self._w.configure(text=value)
+
+    @property
+    def value(self):
+        if self._value is not None:
+            return self._value.get()
+        if self._text is not None:
+            return self._text.get()
+        raise AttributeError("Widget has no associated value")
+    @value.setter
+    def value(self, new_value) -> None:
+        if self._value is not None:
+            self._value.set(new_value)
+        elif self._text is not None:
+            self._text.set(new_value)
+        else:
+            raise AttributeError("Widget has no associated value")
+        
     @property
     def width(self): return self._width
     @width.setter
@@ -68,11 +98,6 @@ class Base:
 class LabelWidget(Base):
     def __init__(self, root, text: str, width: int, height: int, x: int, y: int, **options):
         super().__init__(tk.Label(root, text=text, width=width or 0), width=width, height=height, x=x, y=y, **options)
-
-    @property
-    def text(self): return self._w['text']
-    @text.setter
-    def text(self, v): self._w['text'] = v
         
 ##############################################################################
 # Button
@@ -82,11 +107,6 @@ class ButtonWidget(Base):
     def __init__(self, root, on_click: Optional[Callable], text: str, width: int, height: int, x: int, y: int, **options):
         super().__init__(tk.Button(root, text=text, height=1, command=on_click), width=width, height=height, x=x, y=y, **options)
 
-    @property
-    def text(self): return self._w['text']
-    @text.setter
-    def text(self, v): self._w['text'] = v
-
 ##############################################################################
 # Text Input (Entry)
 ##############################################################################
@@ -95,13 +115,8 @@ class TextInputWidget(Base):
     def __init__(self, root, on_change: Optional[Callable], text: str, width: int, height: int, x: int, y: int, **options):
         self._var = tk.StringVar(value=text)
         entry = tk.Entry(root, textvariable=self._var, width=width or 0)
-        super().__init__(entry, width=width, height=height, x=x, y=y, **options)
+        super().__init__(entry, text=self._var, width=width, height=height, x=x, y=y, **options)
         if on_change: self._var.trace_add("write", lambda *args: on_change())
-
-    @property
-    def text(self): return self._var.get()
-    @text.setter
-    def text(self, v): self._var.set(v)
 
 ##############################################################################
 # Checkbox
@@ -111,12 +126,7 @@ class CheckboxWidget(Base):
     def __init__(self, root, on_click: Optional[Callable], text: str, width: int, height: int, x: int, y: int, **options):
         self._var = tk.BooleanVar()
         cb = tk.Checkbutton(root, text=text, variable=self._var, command=on_click)
-        super().__init__(cb, width=width, height=height, x=x, y=y, **options)
-
-    @property
-    def text(self): return self._w['text']
-    @text.setter
-    def text(self, v): self._w['text'] = v
+        super().__init__(cb, value=self._var, width=width, height=height, x=x, y=y, **options)
 
 ##############################################################################
 # Screen
