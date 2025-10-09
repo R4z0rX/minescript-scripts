@@ -34,12 +34,32 @@ class Base:
         self._height = height
         self._x = x
         self._y = y
+        self._layout = Screen.DEFAULT_LAYOUT
+        self._layout_kwargs: dict[str, object] = {}
         self.place()
         add_options(self._w, **options)
 
-    def place(self):
-        self._w.place(x=self._x, y=self._y, width=self._width, height=self._height)
-
+    def place(self, method=None, **geometry):
+        if method is not None:
+            self._layout = method
+        target = method or self._layout or Screen.DEFAULT_LAYOUT
+        if target == "grid":
+            if geometry:
+                self._layout_kwargs = geometry
+            self._w.place_forget()
+            self._w.pack_forget()
+            self._w.grid(**(geometry or self._layout_kwargs))
+        elif target == "pack":
+            if geometry:
+                self._layout_kwargs = geometry
+            self._w.place_forget()
+            self._w.grid_forget()
+            self._w.pack(**(geometry or self._layout_kwargs))
+        else:
+            self._w.grid_forget()
+            self._w.pack_forget()
+            self._w.place(x=self._x, y=self._y, width=self._width, height=self._height)
+            
     @property
     def text(self) -> str:
         if self._text is not None:
@@ -51,7 +71,6 @@ class Base:
             self._text.set(value)
         else:
             self._w.configure(text=value)
-
     @property
     def value(self):
         if self._value is not None:
@@ -67,22 +86,18 @@ class Base:
             self._text.set(new_value)
         else:
             raise AttributeError("Widget has no associated value")
-        
     @property
     def width(self): return self._width
     @width.setter
     def width(self, v): self._width = v; self.place()
-
     @property
     def height(self): return self._height
     @height.setter
     def height(self, v): self._height = v; self.place()
-
     @property
     def x(self): return self._x
     @x.setter
     def x(self, v): self._x = v; self.place()
-
     @property
     def y(self): return self._y
     @y.setter
@@ -133,13 +148,13 @@ class CheckboxWidget(Base):
 ##############################################################################
 
 class Screen:
+    DEFAULT_LAYOUT = "place"
     def __init__(self, title: str = "", width: int = 320, height: int = 240, x: int = None, y: int = None, **options):
         self._root = tk.Tk()
         self._root.transient(); self._root.grab_set(); self._root.withdraw()
         self._root.title(title); self._root.resizable(False, False)
         self._root.protocol("WM_DELETE_WINDOW", self.close)
         self._root.attributes('-toolwindow', True); self._root.attributes('-topmost', True)
-
         sw, sh = self._root.winfo_screenwidth(), self._root.winfo_screenheight()
         x = (sw - width)//2 if x is None else x
         y = (sh - height)//2 if y is None else y
@@ -172,6 +187,9 @@ class Screen:
     def title(self): return self._root.title()
     @title.setter
     def title(self, v): self._root.title(v)
+    @property
+    def native(self) -> tk.Tk:
+        return self._root
 
     def show(self): self._root.deiconify(); self._root.lift(); self._root.wait_window()
     def close(self): self._root.quit(); self._root.destroy()
