@@ -1,302 +1,203 @@
 """
-    @author RazrCraft
+    @author RazrCraft (Modified by x_xmalo)
     @create date 2025-07-05 07:58:44
-    @modify date 2025-07-05 17:57:52
+    @modify date 2025-10-09 01:25:00
     @desc A helper library for creating simple screens with Tkinter
- """
+"""
 # pylint: disable=W0238
 import tkinter as tk
 from tkinter import simpledialog
-from typing import Callable
+from typing import Callable, Optional
 
+##############################################################################
+# Additional Options Helper
+##############################################################################
 
-class ButtonWidget:
-    def __init__(self, root, on_click: Callable, text: str, width: int, height: int, x: int, y: int):
-        self.__btn = tk.Button(root, text=text, width=width, height=1, command=on_click)
-        self.__btn.place(x=x, y=y, width=width, height=height)
-        self.__on_click = on_click
-        self.__text = text
-        self.__width = self.__btn.winfo_reqwidth()
-        self.__height = height
-        self.__x = x
-        self.__y = y
+def add_options(widget, **options):
+    if not options:
+        return
+    valid = set(widget.keys())
+    clean = {k: v for k, v in options.items() if k in valid}
+    if clean:
+        widget.config(**clean)
+
+##############################################################################
+# Base Widget Properties
+##############################################################################  
+
+class Base:
+    def __init__(self, widget: tk.Widget, *, width: int, height: int, x: int, y: int, **options):
+        self._w = widget
+        self._width = width if width is not None else widget.winfo_reqwidth()
+        self._height = height
+        self._x = x
+        self._y = y
+        self.place()
+        add_options(self._w, **options)
+
+    def place(self):
+        self._w.place(x=self._x, y=self._y, width=self._width, height=self._height)
 
     @property
-    def text(self):
-        return self.__btn['text']
-    @text.setter
-    def text(self, value):
-        self.__btn['text'] = value
-        self.__text = value
-
-    @property
-    def width(self):
-        return self.__width
+    def width(self): return self._width
     @width.setter
-    def width(self, value):
-        self.__width = value
-        self.__btn.place_configure(width=value)
+    def width(self, v): self._width = v; self.place()
 
     @property
-    def height(self):
-        return self.__height
+    def height(self): return self._height
     @height.setter
-    def height(self, value):
-        self.__height = value
-        self.__btn.place_configure(height=value)
+    def height(self, v): self._height = v; self.place()
 
     @property
-    def x(self):
-        return self.__x
+    def x(self): return self._x
     @x.setter
-    def x(self, value):
-        self.__x = value
-        self.__btn.place_configure(x=value)
+    def x(self, v): self._x = v; self.place()
 
     @property
-    def y(self):
-        return self.__y
+    def y(self): return self._y
     @y.setter
-    def y(self, value):
-        self.__y = value
-        self.__btn.place_configure(y=value)
+    def y(self, v): self._y = v; self.place()
 
-    def remove(self):
-        self.__btn.destroy()
+    def style(self, **options): add_options(self._w, **options)
+    def remove(self): self._w.destroy()
 
-class TextInputWidget:
-    def __init__(self, root, on_change: Callable, text: str, width: int, height: int, x: int, y: int):
-        self.__var = tk.StringVar(value=text)
-        self.__entry = tk.Entry(root, textvariable=self.__var, width=width)
-        self.__entry.place(x=x, y=y, width=width, height=height)
-        if on_change:
-            self.__var.trace_add("write", lambda *args: on_change()) # type: ignore
-        self.__on_change = on_change
-        self.__text = text
-        self.__width = self.__entry.winfo_reqwidth()
-        self.__height = height
-        self.__x = x
-        self.__y = y
+##############################################################################
+# Label
+##############################################################################
+
+class LabelWidget(Base):
+    def __init__(self, root, text: str, width: int, height: int, x: int, y: int, **options):
+        super().__init__(tk.Label(root, text=text, width=width or 0), width=width, height=height, x=x, y=y, **options)
 
     @property
-    def text(self):
-        return self.__var.get()
+    def text(self): return self._w['text']
     @text.setter
-    def text(self, value):
-        self.__var.set(value)
-        self.__text = value
+    def text(self, v): self._w['text'] = v
+        
+##############################################################################
+# Button
+##############################################################################
+
+class ButtonWidget(Base):
+    def __init__(self, root, on_click: Optional[Callable], text: str, width: int, height: int, x: int, y: int, **options):
+        super().__init__(tk.Button(root, text=text, height=1, command=on_click), width=width, height=height, x=x, y=y, **options)
 
     @property
-    def width(self):
-        return self.__width
-    @width.setter
-    def width(self, value):
-        self.__width = value
-        self.__entry.place_configure(width=value)
-
-    @property
-    def height(self):
-        return self.__height
-    @height.setter
-    def height(self, value):
-        self.__height = value
-        self.__entry.place_configure(height=value)
-
-    @property
-    def x(self):
-        return self.__x
-    @x.setter
-    def x(self, value):
-        self.__x = value
-        self.__entry.place_configure(x=value)
-
-    @property
-    def y(self):
-        return self.__y
-    @y.setter
-    def y(self, value):
-        self.__y = value
-        self.__entry.place_configure(y=value)
-
-    def remove(self):
-        self.__entry.destroy()
-
-class CheckboxWidget:
-    def __init__(self, root, on_click: Callable, text: str, width: int, height: int, x: int, y: int):
-        self.__var = tk.BooleanVar()
-        self.__cb = tk.Checkbutton(root, text=text, variable=self.__var, command=on_click)
-        self.__cb.place(x=x, y=y, width=width, height=height)
-        self.__on_click = on_click
-        self.__text = text
-        self.__width = self.__cb.winfo_reqwidth()
-        self.__height = height
-        self.__x = x
-        self.__y = y
-
-    @property
-    def text(self):
-        return self.__cb['text']
+    def text(self): return self._w['text']
     @text.setter
-    def text(self, value):
-        self.__cb['text'] = value
-        self.__text = value
+    def text(self, v): self._w['text'] = v
+
+##############################################################################
+# Text Input (Entry)
+##############################################################################
+
+class TextInputWidget(Base):
+    def __init__(self, root, on_change: Optional[Callable], text: str, width: int, height: int, x: int, y: int, **options):
+        self._var = tk.StringVar(value=text)
+        entry = tk.Entry(root, textvariable=self._var, width=width or 0)
+        super().__init__(entry, width=width, height=height, x=x, y=y, **options)
+        if on_change: self._var.trace_add("write", lambda *args: on_change())
 
     @property
-    def width(self):
-        return self.__width
-    @width.setter
-    def width(self, value):
-        self.__width = value
-        self.__cb.place_configure(width=value)
+    def text(self): return self._var.get()
+    @text.setter
+    def text(self, v): self._var.set(v)
+
+##############################################################################
+# Checkbox
+##############################################################################
+
+class CheckboxWidget(Base):
+    def __init__(self, root, on_click: Optional[Callable], text: str, width: int, height: int, x: int, y: int, **options):
+        self._var = tk.BooleanVar()
+        cb = tk.Checkbutton(root, text=text, variable=self._var, command=on_click)
+        super().__init__(cb, width=width, height=height, x=x, y=y, **options)
 
     @property
-    def height(self):
-        return self.__height
-    @height.setter
-    def height(self, value):
-        self.__height = value
-        self.__cb.place_configure(height=value)
+    def text(self): return self._w['text']
+    @text.setter
+    def text(self, v): self._w['text'] = v
 
-    @property
-    def x(self):
-        return self.__x
-    @x.setter
-    def x(self, value):
-        self.__x = value
-        self.__cb.place_configure(x=value)
-
-    @property
-    def y(self):
-        return self.__y
-    @y.setter
-    def y(self, value):
-        self.__y = value
-        self.__cb.place_configure(y=value)
-
-    def remove(self):
-        self.__cb.destroy()
-
+##############################################################################
+# Screen
+##############################################################################
 
 class Screen:
-    def __init__(self, title:str ="", width: int=320, height: int=240, x: int=None, y: int=None):
-        self.__root = tk.Tk()
-        self.__root.transient()
-        self.__root.grab_set()
-        self.__root.withdraw()  # Start hidden
-        self.__root.title(title)
-        self.__root.resizable(False, False)
-        self.__root.protocol("WM_DELETE_WINDOW", self.close)
-        self.__root.attributes('-toolwindow', True) 
-        self.__root.attributes('-topmost', True)
-        self.__widgets = []
+    def __init__(self, title: str = "", width: int = 320, height: int = 240, x: int = None, y: int = None, **options):
+        self._root = tk.Tk()
+        self._root.transient(); self._root.grab_set(); self._root.withdraw()
+        self._root.title(title); self._root.resizable(False, False)
+        self._root.protocol("WM_DELETE_WINDOW", self.close)
+        self._root.attributes('-toolwindow', True); self._root.attributes('-topmost', True)
 
-        # Center window if x/y not provided
-        screen_w = self.__root.winfo_screenwidth()
-        screen_h = self.__root.winfo_screenheight()
-        if x is None:
-            x = (screen_w - width) // 2
-        if y is None:
-            y = (screen_h - height) // 2
-        self.__root.geometry(f"{width}x{height}+{x}+{y}")
+        sw, sh = self._root.winfo_screenwidth(), self._root.winfo_screenheight()
+        x = (sw - width)//2 if x is None else x
+        y = (sh - height)//2 if y is None else y
+        self._width, self._height, self._x, self._y = width, height, x, y
+        self.apply_geometry()
+        self._root.bind("<Escape>", lambda e: self.close())
+        add_options(self._root, **options)
+        self._widgets = []
 
-        self.__root.bind("<Escape>", lambda e: self.close())
-
-        self.__title = title
-        self.__width = width
-        self.__height = height
-        self.__x = x
-        self.__y = y
+    def apply_geometry(self):
+        self._root.geometry(f"{self._width}x{self._height}+{self._x}+{self._y}")
 
     @property
-    def title(self):
-        return self.__title
-
-    @title.setter
-    def title(self, value):
-        self.__title = value
-        self.__root.title(value)
-
-    @property
-    def width(self):
-        return self.__width
-
+    def width(self): return self._width
     @width.setter
-    def width(self, value):
-        self.__width = value
-        self.__root.geometry(f"{self.__width}x{self.__height}+{self.__x}+{self.__y}")
-
+    def width(self, v): self._width = v; self.apply_geometry()
     @property
-    def height(self):
-        return self.__height
-
+    def height(self): return self._height
     @height.setter
-    def height(self, value):
-        self.__height = value
-        self.__root.geometry(f"{self.__width}x{self.__height}+{self.__x}+{self.__y}")
-
+    def height(self, v): self._height = v; self.apply_geometry()
     @property
-    def x(self):
-        return self.__x
-
+    def x(self): return self._x
     @x.setter
-    def x(self, value):
-        self.__x = value
-        self.__root.geometry(f"{self.__width}x{self.__height}+{self.__x}+{self.__y}")
-
+    def x(self, v): self._x = v; self.apply_geometry()
     @property
-    def y(self):
-        return self.__y
-
+    def y(self): return self._y
     @y.setter
-    def y(self, value):
-        self.__y = value
-        self.__root.geometry(f"{self.__width}x{self.__height}+{self.__x}+{self.__y}")
+    def y(self, v): self._y = v; self.apply_geometry()
+    @property
+    def title(self): return self._root.title()
+    @title.setter
+    def title(self, v): self._root.title(v)
 
-    def show(self):
-        self.__root.deiconify()
-        self.__root.lift()
-        #self.__root.mainloop()
-        self.__root.wait_window()
+    def show(self): self._root.deiconify(); self._root.lift(); self._root.wait_window()
+    def close(self): self._root.quit(); self._root.destroy()
 
-    def close(self):
-        self.__root.quit()
-        self.__root.destroy()
+    def flow(self, width, height, x, y, down, right):
+        if down:  x, y = down.x, down.y + down.height + 10
+        if right: x, y = right.x + right.width + 10, right.y
+        return width, height, x, y
 
-    def add_button(self, on_click: Callable=None, text: str="", width: int=None, height: int=20, x: int=0, y: int=0, down=None, right=None) -> ButtonWidget:
-        if down:
-            x = down.x
-            y = down.y + down.height + 10
-        if right:
-            y = right.y
-            x = right.x + right.width + 10
-        btn = ButtonWidget(self.__root, on_click, text, width, height, x, y)
-        self.__widgets.append(btn)
-        return btn
+##############################################################################
+# Widget Creation Methods
+##############################################################################
 
-    def text_input(self, on_change: Callable=None, text: str="", width: int=None, height: int=20, x: int=0, y: int=0, down=None, right=None) -> TextInputWidget:
-        if down:
-            x = down.x
-            y = down.y + down.height + 10
-        if right:
-            y = right.y
-            x = right.x + right.width + 10
-        txt = TextInputWidget(self.__root, on_change, text, width, height, x, y)
-        self.__widgets.append(txt)
-        return txt
+    def add_label(self, text="", width=None, height=20, x=0, y=0, down=None, right=None, **options):
+        width, height, x, y = self.flow(width, height, x, y, down, right)
+        w = LabelWidget(self._root, text, width, height, x, y, **options)
+        self._widgets.append(w); return w
 
-    def add_checkbox(self, on_click: Callable=None, text: str="", width: int=None, height: int=20, x: int=0, y: int=0, down=None, right=None) -> CheckboxWidget:
-        if down:
-            x = down.x
-            y = down.y + down.height + 10
-        if right:
-            y = right.y
-            x = right.x + right.width + 10
-        cb = CheckboxWidget(self.__root, on_click, text, width, height, x, y)
-        self.__widgets.append(cb)
-        return cb
-    
-    def input_dialog(self, title: str="", prompt: str="") -> str | None:
-        self.__root.attributes('-topmost', False)
-        result = simpledialog.askstring(title, prompt)
-        self.__root.attributes('-topmost', True)
-        return result
+    def add_button(self, on_click=None, text="", width=None, height=20, x=0, y=0, down=None, right=None, **options):
+        width, height, x, y = self.flow(width, height, x, y, down, right)
+        w = ButtonWidget(self._root, on_click, text, width, height, x, y, **options)
+        self._widgets.append(w); return w
+
+    def text_input(self, on_change=None, text="", width=None, height=20, x=0, y=0, down=None, right=None, **options):
+        width, height, x, y = self.flow(width, height, x, y, down, right)
+        w = TextInputWidget(self._root, on_change, text, width, height, x, y, **options)
+        self._widgets.append(w); return w
+
+    def add_checkbox(self, on_click=None, text="", width=None, height=20, x=0, y=0, down=None, right=None, **options):
+        width, height, x, y = self.flow(width, height, x, y, down, right)
+        w = CheckboxWidget(self._root, on_click, text, width, height, x, y, **options)
+        self._widgets.append(w); return w
+
+    def input_dialog(self, title: str = "", prompt: str = "") -> str | None:
+        self._root.attributes('-topmost', False)
+        try:
+            return simpledialog.askstring(title, prompt)
+        finally:
+            self._root.attributes('-topmost', True)
