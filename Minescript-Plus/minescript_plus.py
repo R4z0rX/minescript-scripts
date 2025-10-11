@@ -1403,9 +1403,9 @@ toggle_key = 301  # F12
 tl = None
 frames = 0
 show = True
-_texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool, float, float]] = {}
+_texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool, float, float, list]] = {}
 _ti: int = 0
-_items: dict[int, tuple[bool, str, int, int, str, float, float, float]] = {}
+_items: dict[int, tuple[bool, str, int, int, str, float, float, float, list]] = {}
 _ii: int = 0
 
 def _check_ver(ver: str) -> bool:
@@ -1446,7 +1446,7 @@ def _update_text(index: int, *t):
     global _texts
     
     _texts[index] = update_tuple(_texts[index], t)
-
+    
 def _get_text_string(index: int):
     return _texts[index][1]
     
@@ -1591,12 +1591,14 @@ def on_hud_render(guiGraphics, tickDeltaManager):
     
     winx = int(mc.getWindow().getGuiScaledWidth())
     winy = int(mc.getWindow().getGuiScaledHeight())
-    
+    screen = str(screen_name())  # None object gets turned into "None" here
     for t in _texts:
         # _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool, float, float]]
-        state, text, x, y, r, g, b, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY = _texts[t]
+        state, text, x, y, r, g, b, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY, screens = _texts[t]
         
-        if state:
+        found = (screens == "all") or (screen in screens)
+
+        if state and found:
             styled_text = Component.literal(text)
             if italic:
                 styled_text = styled_text.withStyle(ChatFormatting.ITALIC)
@@ -1627,9 +1629,11 @@ def on_hud_render(guiGraphics, tickDeltaManager):
                 pose_stack.popPose()
     
     for i in _items:
-        state, item_id, x, y, count, scale, anchorX, anchorY = _items[i]
+        state, item_id, x, y, count, scale, anchorX, anchorY, screens = _items[i]
         
-        if state:
+        found = (screens == "all") or (screen in screens)
+        
+        if state and found:
             scale = scale.floatValue()
             pose_stack = guiGraphics.pose()
             if _check_ver("1.21.6"):
@@ -1689,7 +1693,7 @@ HudRenderCallback.EVENT.register(HudRenderCallback(callback))
 
 class Hud:    
     @staticmethod
-    def add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
+    def add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, screens = "all", 
         shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1) -> int:
         """
         Adds a text string to the Minecraft HUD at the specified position.
@@ -1703,16 +1707,17 @@ class Hud:
             shadow, italic, underline, strikethrough, obfsucated (bool, optional): Text effects.
             AnchorX, AnchorY: adds a % of the screen to where your text is rendered. (0-1)
             JustifyX, JustifyY: justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
+            screens: only renders the text on selected screens. Default: all screens
         Returns:
             int: Index of the added text.
         """
         _check_fabric("Hud")
         place_x = int(x - ((justifyX + 1) * mc.font.width(text) * scale * 0.5)) # type: ignore
-        place_y = int(y - ((justifyY + 1) * mc.font.lineHeight * scale * 0.4)) # type: ignore
-        return _add_text(True, text, place_x, place_y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY) # type: ignore
+        place_y = int(y - ((justifyY + 1) * mc.font.lineHeight * scale * 0.5)) # type: ignore
+        return _add_text(True, text, place_x, place_y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY, screens) # type: ignore
 
     @staticmethod
-    def update_text(index: int, text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
+    def update_text(index: int, text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, screens="all",
         shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1):
         """
         Updates a text string to the Minecraft HUD at the specified position.
@@ -1733,7 +1738,8 @@ class Hud:
         _check_fabric("Hud")
         place_x = int(x - ((justifyX + 1) * mc.font.width(text) * scale * 0.5)) # type: ignore
         place_y = int(y - ((justifyY + 1) * mc.font.lineHeight * scale * 0.5)) # type: ignore
-        _update_text(index, True, text, place_x, place_y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY)
+        _update_text(index, True, text, place_x, place_y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY, screens)
+        
 
     @staticmethod
     def get_text_string(index: int) -> str:
