@@ -21,7 +21,7 @@ This module should be imported by other scripts and not run directly.
 * [`lib_nbt v1`](https://minescript.net/sdm_downloads/lib_nbt-v1/) (optional, for `Inventory.find_item()` only)
 
 \
-For Minescript Plus v0.12-alpha or earlier:
+For [Minescript Plus v0.12-alpha](https://github.com/R4z0rX/minescript-scripts/blob/e3080ad8e0ececa7c4278f525f9dbf2f9d943dc2/Minescript-Plus/minescript_plus.py) or earlier:
 (Although I never tried it on versions before 1.21.4)
 
 * Minecraft (any version supported by Minescript)
@@ -46,6 +46,17 @@ Use the classes and methods as shown in the examples below to interact with Mine
 ---
 
 ## Classes & Methods
+
+Some classes in Minescript Plus—specifically **Client**, **Player**, and **World**—expose the original Minecraft class instance when initialized. This means you can access their public fields and methods directly, in addition to the documented API. For example:
+
+```python
+from minescript_plus import Player
+
+p = Player()
+print(p.getArmorValue())
+```
+
+You can use the documented API methods below, or invoke any public method/field available on the underlying Minecraft class.
 
 ### [`Inventory`](Minescript-Plus/minescript_plus.py )
 Provides methods for interacting with the player's inventory and other containers screens. \
@@ -209,8 +220,14 @@ Methods for retrieving player information.
 - **get_saturation_level() -> float**  
   Retrieves the player's saturation level.
 
-- **get_player_block_position() -> list[int]**
+- **get_player_block_position() -> list[int]**  
   Returns the player's current block position as a list of integers.
+
+- **get_xp_levels() -> int**  
+  Returns the player's current XP levels (same as `/xp query @s levels`).
+
+- **get_experience_progress() -> float**  
+  Returns the player's current XP bar progress (0.0 to 1.0).
 
 ---
 
@@ -270,6 +287,19 @@ Methods for retrieving world information.
 - **get_targeted_sign_text() -> list[str]**  
   Retrieves the text from both the front and back sides of the sign block currently targeted by the player.  
   *Returns:* A list containing the text lines from the targeted sign (first four elements are the front, next four are the back).
+
+- **find_nearest_entity(name_str: str="", type_str: str="") -> EntityData | None**  
+  Finds the nearest entity matching the specified name and/or type.  
+  *Returns:* The nearest matching entity, or `None` if no entity is found.
+
+- **get_destroy_progress() -> float**  
+  Returns the percentage of destruction of the block that is currently being broken.  
+  *Returns:* The destroy progress (0.0 means not being broken, 1.0 means fully broken).
+
+- **get_destroy_stage() -> int**  
+  Returns the stage of destruction of the block that is currently being broken.  
+  *Returns:* The destroy stage (0-9, 0 means not being broken).
+
 ---
 
 ### [`Trading`](Minescript-Plus/minescript_plus.py)
@@ -326,12 +356,12 @@ if offers:
 
 Methods for rendering custom text and items on the Minecraft HUD (Heads-Up Display). Requires **Fabric API** mod.
 
-- **add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False) -> int**  
+- **add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1, screens: str | list[str]="all") -> int**  
   Adds a styled text string to the HUD at the specified position.  
-  *Returns:* The index of the added text.
+  *Returns:* The index of the added text.  
 
-- **update_text(index: int, text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False) -> None**  
-  Updates an existing HUD text entry at the given index with new properties.
+- **update_text(index: int, text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1) -> None**  
+  Updates an existing HUD text entry at the given index with new properties.  
 
 - **get_text_string(index: int) -> str**  
   Returns the text string of the HUD entry at the given index.
@@ -375,12 +405,12 @@ Methods for rendering custom text and items on the Minecraft HUD (Heads-Up Displ
 - **get_item_name(item) -> str**  
   Returns the display name of an item.
 
-- **add_item(item_id: str, x: int, y: int, count: str="", scale: float=1.0) -> int**  
+- **add_item(item_id: str, x: int, y: int, count: str="", scale: float=1.0, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1, screens: str | list[str]="all") -> int**  
   Adds an item icon to the HUD at the specified position.  
-  *Returns:* The index of the added item.
+  *Returns:* The index of the added item.  
 
-- **update_item(index: int, item_id: str, x: int, y: int, count: str="", scale: float=1.0) -> None**  
-  Updates an existing HUD item entry at the given index with new properties.
+- **update_item(index: int, item_id: str, x: int, y: int, count: str="", scale: float=1.0, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1) -> None**  
+  Updates an existing HUD item entry at the given index with new properties.  
 
 - **get_item_string(index: int) -> str**  
   Returns the item ID string of the HUD item entry at the given index.

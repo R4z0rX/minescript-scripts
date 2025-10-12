@@ -2,7 +2,7 @@
     Minescript Plus
     Version: 0.16.0-alpha
     Author: RazrCraft
-    Date: 2025-09-30
+    Date: 2025-10-11
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -735,6 +735,9 @@ class Key:
 # # # CLIENT # # #
 
 class Client:
+    def __new__(cls):
+        return mc
+    
     @staticmethod
     def pause_game(pause_only: bool=False):
         mc.pauseGame(pause_only)
@@ -808,6 +811,9 @@ class Client:
 # # # PLAYER # # #
 
 class Player:
+    def __new__(cls):
+        return mc.player
+    
     @staticmethod
     def __get_player_info(name: str):
         return mc.player.connection.getPlayerInfo(name)
@@ -896,6 +902,26 @@ class Player:
             list of int: The [x, y, z] coordinates of the player's block position.
         """
         return [floor(p) for p in player_position()]
+
+    @staticmethod
+    def get_xp_levels() -> int:
+        """
+        Returns the player's current XP levels.
+
+        Returns:
+            int: The player's current XP levels (same as `/xp query @s levels`).
+        """
+        return mc.player.experienceLevel # type: ignore
+
+    @staticmethod
+    def get_experience_progress() -> float:
+        """
+        Returns the player's current XP progress (XP bar percentage).
+
+        Returns:
+            float: The player's current XP bar progress (0.0 to 1.0).
+        """
+        return mc.player.experienceProgress # type: ignore
 
 # # # SERVER # # #
 
@@ -1004,6 +1030,9 @@ class Server:
 # # # WORLD # # #
 
 class World:
+    def __new__(cls):
+        return mc.level
+    
     @staticmethod
     def __get_level_data():
         return mc.player.connection.getLevel().getLevelData()
@@ -1117,6 +1146,26 @@ class World:
         else:
             el = entities(name=name, sort="nearest")
         return el[0] if len(el) > 0 else None
+
+    @staticmethod
+    def get_destroy_progress() -> float:
+        """
+        Returns the percentage of destruction of the block that is currently being broken.
+
+        Returns:
+            float: The destroy progress (0.0 means not being broken, 1.0 means fully broken).
+        """
+        return _get_private_field(mc.gameMode, "destroyProgress") # type: ignore
+
+    @staticmethod
+    def get_destroy_stage() -> int:
+        """
+        Returns the stage of destruction of the block that is currently being broken.
+
+        Returns:
+            int: The destroy stage (0-9, 0 means not being broken).
+        """
+        return mc.gameMode.getDestroyStage() # type: ignore
 
 # # # TRADING # # #
 
@@ -1693,8 +1742,8 @@ HudRenderCallback.EVENT.register(HudRenderCallback(callback))
 
 class Hud:    
     @staticmethod
-    def add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, screens = "all", 
-        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1) -> int:
+    def add_text(text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, 
+        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1, screens: str | list[str]="all") -> int:
         """
         Adds a text string to the Minecraft HUD at the specified position.
         Args:
@@ -1705,9 +1754,9 @@ class Hud:
             alpha (int, optional): Alpha transparency. Default: 255
             scale (float, optional): Text scale. Default: 1.0
             shadow, italic, underline, strikethrough, obfsucated (bool, optional): Text effects.
-            AnchorX, AnchorY: adds a % of the screen to where your text is rendered. (0-1)
-            JustifyX, JustifyY: justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
-            screens: only renders the text on selected screens. Default: all screens
+            AnchorX, AnchorY (float): adds a % of the screen to where your text is rendered. (0-1)
+            JustifyX, JustifyY (float): justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
+            screens (str | list[str], optional): only renders the text on selected screens. Default: all screens
         Returns:
             int: Index of the added text.
         """
@@ -1717,8 +1766,8 @@ class Hud:
         return _add_text(True, text, place_x, place_y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY, screens) # type: ignore
 
     @staticmethod
-    def update_text(index: int, text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0, screens="all",
-        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1):
+    def update_text(index: int, text: str, x: int, y: int, color: tuple=(255,255,255), alpha: int=255, scale: float=1.0,
+        shadow: bool=False, italic: bool=False, underline: bool=False, strikethrough: bool=False, obfsucated: bool=False, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1, screens: str | list[str]="all"):
         """
         Updates a text string to the Minecraft HUD at the specified position.
         Args:
@@ -1730,8 +1779,9 @@ class Hud:
             alpha (int, optional): Alpha transparency. Default: 255
             scale (float, optional): Text scale. Default: 1.0
             shadow, italic, underline, strikethrough, obfsucated (bool, optional): Text effects.
-            AnchorX, AnchorY: adds a % of the screen to where your text is rendered. (0-1)
-            JustifyX, JustifyY: justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
+            AnchorX, AnchorY (float): adds a % of the screen to where your text is rendered. (0-1)
+            JustifyX, JustifyY (float): justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
+            screens (str | list[str], optional): only renders the text on selected screens. Default: all screens
         Returns:
             int: Index of the added text.
         """
@@ -1903,8 +1953,8 @@ class Hud:
             y (int): Y position on screen.
             count (str, optional): Text to show as item count. Default: ""
             scale (float, optional): Icon scale. Default: 1.0
-            AnchorX, AnchorY: adds a % of the screen to where your text is rendered. (0-1)
-            JustifyX, JustifyY: justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
+            AnchorX, AnchorY (float): adds a % of the screen to where your item is rendered. (0-1)
+            JustifyX, JustifyY (float): justfies item to a corner (-1,-1) being top left and (1,1) being bottom right.
         Returns:
             int: Index of the added item.
         """
@@ -1924,8 +1974,8 @@ class Hud:
             y (int): Y position on screen.
             count (str, optional): Text to show as item count. Default: ""
             scale (float, optional): Icon scale. Default: 1.0
-            AnchorX, AnchorY: adds a % of the screen to where your text is rendered. (0-1)
-            JustifyX, JustifyY: justfies text to a corner (-1,-1) being top left and (1,1) being bottom right.
+            AnchorX, AnchorY (float): adds a % of the screen to where your item is rendered. (0-1)
+            JustifyX, JustifyY (float): justfies item to a corner (-1,-1) being top left and (1,1) being bottom right.
         """
         _check_fabric("Hud")
         place_x = int(x - ((justifyX + 1) * 16 * scale / 2))
