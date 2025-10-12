@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.15.0-alpha  
+**Version:** 0.16.0-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-09-30
+**Date:** 2025-10-12
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.

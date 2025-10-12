@@ -2,7 +2,7 @@
     Minescript Plus
     Version: 0.16.0-alpha
     Author: RazrCraft
-    Date: 2025-10-11
+    Date: 2025-10-12
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -1479,7 +1479,7 @@ def combine(*values):
 
 def update_tuple(old_tuple, *new_values):
     updated_list = list(old_tuple)
-    for i, value in enumerate(new_values):
+    for i, value in enumerate(updated_list):
         updated_list[i] = value
     return tuple(updated_list)
 
@@ -1944,7 +1944,7 @@ class Hud:
         return _get_item_name(item) # type: ignore
     
     @staticmethod
-    def add_item(item_id: str, x: int, y: int, count: str="", scale: float=1.0, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1) -> int:
+    def add_item(item_id: str, x: int, y: int, count: str="", scale: float=1.0, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1, screens: str | list[str]="all") -> int:
         """
         Adds an item icon to the HUD at the specified position.
         Args:
@@ -1955,16 +1955,17 @@ class Hud:
             scale (float, optional): Icon scale. Default: 1.0
             AnchorX, AnchorY (float): adds a % of the screen to where your item is rendered. (0-1)
             JustifyX, JustifyY (float): justfies item to a corner (-1,-1) being top left and (1,1) being bottom right.
+            screens (str | list[str], optional): only renders the item on selected screens. Default: all screens
         Returns:
             int: Index of the added item.
         """
         _check_fabric("Hud")
         place_x = int(x - ((justifyX + 1) * 16 * scale / 2))
         place_y = int(y - ((justifyY + 1) * 16 * scale / 2))
-        return _add_item(True, item_id, place_x, place_y, count, scale, anchorX, anchorY) # type: ignore
+        return _add_item(True, item_id, place_x, place_y, count, scale, anchorX, anchorY, screens) # type: ignore
     
     @staticmethod
-    def update_item(index: int, item_id: str, x: int, y: int, count: str="", scale: float=1.0, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1):
+    def update_item(index: int, item_id: str, x: int, y: int, count: str="", scale: float=1.0, anchorX: float=0, anchorY: float=0, justifyX: float=-1, justifyY: float=-1, screens: str | list[str]="all"):
         """
         Adds an item icon to the HUD at the specified position.
         Args:
@@ -1976,11 +1977,12 @@ class Hud:
             scale (float, optional): Icon scale. Default: 1.0
             AnchorX, AnchorY (float): adds a % of the screen to where your item is rendered. (0-1)
             JustifyX, JustifyY (float): justfies item to a corner (-1,-1) being top left and (1,1) being bottom right.
+            screens (str | list[str], optional): only renders the item on selected screens. Default: all screens
         """
         _check_fabric("Hud")
         place_x = int(x - ((justifyX + 1) * 16 * scale / 2))
         place_y = int(y - ((justifyY + 1) * 16 * scale / 2))
-        _update_item(True, item_id, place_x, place_y, count, scale, anchorX, anchorY)
+        _update_item(True, item_id, place_x, place_y, count, scale, anchorX, anchorY, screens)
 
     @staticmethod
     def get_item_string(index: int) -> str:
