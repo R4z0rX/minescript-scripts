@@ -2,7 +2,7 @@
     Minescript Plus
     Version: 0.16.0-alpha
     Author: RazrCraft
-    Date: 2025-10-12
+    Date: 2025-10-14
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -515,7 +515,7 @@ class Inventory:
             nbt: dict = lib_nbt.parse_snbt(it.nbt)
             if "components" in nbt:
                 comp = nbt.get("components")
-                if "minecraft:custom_name" in comp:  # type: ignore
+                if "minecraft:custom_name" in comp and comp.get("minecraft:custom_name") == cust_name:  # type: ignore
                     return it.slot
 
         return None
