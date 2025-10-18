@@ -1,6 +1,6 @@
 """
     Minescript Plus
-    Version: 0.16.0-alpha
+    Version: 0.16.1-alpha
     Author: RazrCraft
     Date: 2025-10-14
 
@@ -26,8 +26,8 @@ from time import sleep
 from math import floor
 from typing import Callable, Literal, Any
 from dataclasses import dataclass, asdict
-from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock,
-                        player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name,
+from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock, 
+                        player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name, player_hand_items, 
                         job_info, container_get_items, player_position, entities, echo_json)
 from minescript import VersionInfo as VF
 from minescript import version_info as ver_info
@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 
 set_default_executor(script_loop)
 
-_ver: str = "0.16.0-alpha"
+_ver: str = "0.16.1-alpha"
 
 if svi < (3, 10):
     exit("Minescript Plus requires Python 3.10 or later.")
@@ -344,7 +344,13 @@ def _check_fabric(clazz: str):
     if not fabric:
         print(f"Error: {clazz} class is only supported on Fabric")
         exit(1)
-    
+
+def _get_nbt(snbt: str) -> dict | None:
+    try:
+        return lib_nbt.parse_snbt(snbt)
+    except:  # noqa: E722
+        return None
+
 # # # INVENTORY # # #
 
 class Inventory:
@@ -512,8 +518,8 @@ class Inventory:
                 return None
 
         for it in fi:
-            nbt: dict = lib_nbt.parse_snbt(it.nbt)
-            if "components" in nbt:
+            nbt: dict | None = _get_nbt(it.nbt)
+            if nbt is not None and "components" in nbt:
                 comp = nbt.get("components")
                 if "minecraft:custom_name" in comp and comp.get("minecraft:custom_name") == cust_name:  # type: ignore
                     return it.slot
@@ -533,6 +539,22 @@ class Inventory:
             int: The total count of items with the specified item ID in the inventory.
         """
         return sum(stack.count for stack in inventory if stack.item == item_id)
+
+    @staticmethod
+    def get_lore(item: ItemStack=None) -> str | None:
+        if item is None:
+            item = player_hand_items().main_hand
+        if item is not None:
+            if type(item) is dict:
+                snbt: str = item.get("nbt")
+            else:
+                snbt: str = item.nbt
+            nbt: dict | None = _get_nbt(snbt)
+            if nbt is not None and "components" in nbt:
+                comp = nbt.get("components")
+                if "minecraft:lore" in comp:  # type: ignore
+                    return comp.get("minecraft:lore")
+        return None
 
 # # # SCREEN # # #
 
@@ -1477,9 +1499,9 @@ def render_item_count(gui_graphics, font, item_stack, scaled_X, scaled_Y, count)
 def combine(*values):
     return values
 
-def update_tuple(old_tuple, *new_values):
+def update_tuple(old_tuple, new_values):
     updated_list = list(old_tuple)
-    for i, value in enumerate(updated_list):
+    for i, value in enumerate(new_values):
         updated_list[i] = value
     return tuple(updated_list)
 
