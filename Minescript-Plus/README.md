@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.16.0-alpha  
+**Version:** 0.17.0-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-10-12
+**Date:** 2025-11-07
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.
@@ -284,9 +284,15 @@ Methods for retrieving world information.
 - **get_day_time() -> int**  
   Returns the current day time in ticks.
 
-- **get_targeted_sign_text() -> list[str]**  
+- **get_sign_text(x: int=None, y: int=None, z: int=None) -> list[str] | None**  
   Retrieves the text from both the front and back sides of the sign block currently targeted by the player.  
   *Returns:* A list containing the text lines from the targeted sign (first four elements are the front, next four are the back).
+  Alias: set_targeted_sign_text()
+
+- **set_sign_text(text: list[str], x: int=None, y: int=None, z: int=None, is_front: bool=None) -> bool**  
+  Retrieves the text from both the front and back sides of the sign block currently targeted by the player.  
+  *Returns:* A list containing the text lines from the targeted sign (first four elements are the front, next four are the back).
+  Alias: set_targeted_sign_text()
 
 - **find_nearest_entity(name_str: str="", type_str: str="") -> EntityData | None**  
   Finds the nearest entity matching the specified name and/or type.  
@@ -465,6 +471,57 @@ Hud.set_item_position(item_id, 45, 60)
 # Item count
 current_count = int(Hud.get_item_count(item_id))
 Hud.set_item_count(item_id, str(current_count + 5))
+```
+
+---
+
+### WorldRender
+
+Methods for rendering wireframe blocks and floating texts in the world (3D debug rendering).
+
+- **add_block(x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255) -> None**  
+  Adds/Updates a wireframe block at the given integer world coordinates. Color channels and alpha are 0–255.
+
+- **remove_block(x: int, y: int, z: int) -> None**  
+  Removes a previously added wireframe block at the specified coordinates.
+
+- **get_block_list() -> dict**  
+  Returns the internal mapping of currently tracked wireframe blocks as {(x, y, z): (r, g, b, a)}.
+
+- **add_text(x: float, y: float, z: float, text: str, r: int=255, g: int=255, b: int=255, a: int=255, size: float=1.0) -> None**  
+  Adds/Updates a floating text label at the given world coordinates. `size` scales the rendered text.
+
+- **remove_text(x: float, y: float, z: float) -> None**  
+  Removes a floating text previously added at the specified coordinates.
+
+- **get_text_list() -> dict**  
+  Returns the internal mapping of floating texts as {(x, y, z): (text, r, g, b, a, size)}.
+
+- **show_wr(enable: bool) -> None**  
+  Enables or disables display of all WorldRender content.
+
+- **use_toggle_key(enable: bool) -> None**  
+  Enables/disables the key listener which toggles WorldRender display (default key is F12).
+
+- **set_toggle_key(toggle_key: int) -> None**  
+  Sets the GLFW key code used to toggle WorldRender display.
+
+**Example:**
+```python
+# Example usage
+from minescript_plus import WorldRender
+
+# add a semi-transparent red wireframe at (10, 64, 10)
+WorldRender.add_block(10, 64, 10, r=255, g=0, b=0, a=128)
+
+# add a floating yellow label above the block (previous wirefame)
+WorldRender.add_text(10.5, 65.5, 10.5, "Sample", r=255, g=255, b=0, a=255, size=1.0)
+
+# enable toggle key to show/hide the world render overlay
+WorldRender.use_toggle_key(True)
+
+# hide the world render overlay from code instead of a toggle key
+WorldRender.show_wr(False)
 ```
 
 ---

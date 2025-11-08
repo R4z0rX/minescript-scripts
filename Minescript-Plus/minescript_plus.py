@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.16.1-alpha
+    Version: 0.17.0-alpha
     Author: RazrCraft
-    Date: 2025-10-14
+    Date: 2025-11-07
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 
 set_default_executor(script_loop)
 
-_ver: str = "0.16.1-alpha"
+_ver: str = "0.17.0-alpha-dev"
 
 if svi < (3, 10):
     exit("Minescript Plus requires Python 3.10 or later.")
@@ -1124,15 +1124,16 @@ class World:
         return World.__get_level_data().getDayTime() # type: ignore
    
     @staticmethod
-    def get_targeted_sign_text() -> list[str] | None:
+    def get_sign_text(x: int=None, y: int=None, z: int=None) -> list[str] | None:
         """
         Retrieves the text from both the front and back sides of the sign block currently targeted by the player.
         
         Returns:
             list[str]: A list containing the text lines from the targeted sign. The first four elements are the lines from the front side, and the next four are from the back side.
         """
-        position = player_get_targeted_block().position
-        pos = BlockPos(*position)
+        if x is None or y is None or z is None:
+            x, y, z = player_get_targeted_block().position
+        pos = BlockPos(x, y, z)
 
         sign = mc.level.getBlockEntity(pos)
         if sign is None:
@@ -1148,7 +1149,101 @@ class World:
             sign_text.append(sign.getText(False).getMessage(i, True).tryCollapseToString())
         
         return sign_text
+    
+    @staticmethod
+    def get_targeted_sign_text() -> list[str] | None:
+        # Alias for get_sign_text() to keep retro-compatibility
+        return World.get_sign_text()
         
+    @staticmethod
+    def set_sign_text(text: list[str], x: int=None, y: int=None, z: int=None, is_front: bool=None) -> bool:
+        """
+        Set the text of a sign in the Minecraft client.
+        This function attempts to set the four lines of a sign at the given block
+        coordinates or, if coordinates are omitted, on the block the player is
+        currently targeting. It interacts with the Minecraft client to open/use the
+        sign, send a sign-update packet, and update the client-side block entity.
+        Args:
+          text (list[str]): A list of exactly four strings for the sign lines
+            (line 0 through line 3). Each line will be passed through the client's
+            text filtering before being applied.
+          x (int | None): X coordinate of the sign block. If None, the player's
+            targeted block is used.
+          y (int | None): Y coordinate of the sign block. If None, the player's
+            targeted block is used.
+          z (int | None): Z coordinate of the sign block. If None, the player's
+            targeted block is used.
+          is_front (bool | None): If True/False, selects whether the "front" text
+            face is edited. If None, the function will ask the block entity whether
+            the player is editing the front face and use that result.
+        Returns:
+          bool: True if the operation was initiated and the sign was updated client-
+            side; False if the function could not find a sign at the target location
+            (e.g., coordinates omitted and the player isn't targeting a sign, or the
+            targeted block is not a sign).
+        """
+        with render_loop:
+            pyj = eval_pyjinn_script(r"""
+List = JavaClass("java.util.List")
+MinecraftClient = JavaClass("net.minecraft.client.Minecraft")
+BlockPos = JavaClass("net.minecraft.core.BlockPos")
+ServerboundSignUpdatePacket = JavaClass("net.minecraft.network.protocol.game.ServerboundSignUpdatePacket")
+FilteredText = JavaClass("net.minecraft.server.network.FilteredText")
+InteractionHand = JavaClass("net.minecraft.world.InteractionHand")
+Direction = JavaClass("net.minecraft.core.Direction")
+Vec3 = JavaClass("net.minecraft.world.phys.Vec3")
+BlockHitResult = JavaClass("net.minecraft.world.phys.BlockHitResult")
+
+mc = MinecraftClient.getInstance()
+
+def _get_bloch_hit_result(bpos):
+    hit_vec = Vec3(bpos.getX() + 0.5, bpos.getY() + 1.0, bpos.getZ() + 0.5)
+    return BlockHitResult(hit_vec, Direction.UP, bpos, False)
+
+def _set_sign_text(text: list[str], x: int=None, y: int=None, z: int=None, is_front: bool=None) -> bool:
+    line1 = FilteredText.fullyFiltered(text[0])
+    line2 = FilteredText.fullyFiltered(text[1])
+    line3 = FilteredText.fullyFiltered(text[2])
+    line4 = FilteredText.fullyFiltered(text[3])
+    
+    if x is None or y is None or z is None:
+        target = player_get_targeted_block()
+
+        if target.type.contains("sign"):
+            x, y, z = target.position
+        else:
+            return False
+    
+    block_pos = BlockPos(x, y, z)
+    bhr = _get_bloch_hit_result(block_pos)
+    mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, bhr)
+
+    player_uuid = mc.player.getUUID()
+    block_entity = mc.level.getBlockEntity(block_pos)
+    block_entity.setAllowedPlayerEditor(player_uuid)
+    if is_front is None:
+        is_front = block_entity.isFacingFrontText(mc.player)
+    
+    block_entity.setAllowedPlayerEditor(player_uuid)
+    packet = ServerboundSignUpdatePacket(BlockPos(x, y, z), is_front, *text)
+    mc.player.connection.getConnection().send(packet)
+    
+    block_entity.updateSignText(mc.player, is_front, List.of(line1, line2, line3, line4))
+    
+    set_timeout(lambda: mc.setScreen(None), 100)
+    return True
+
+            """)
+        
+            _set_sign_text = pyj.get("_set_sign_text")
+        
+            return _set_sign_text(text, x, y, z, is_front) # type: ignore
+    
+    @staticmethod
+    def set_targeted_sign_text() -> bool:
+        # Alias for set_sign_text()
+        return World.set_sign_text()
+    
     @staticmethod
     def find_nearest_entity(name_str: str="", type_str: str="") -> EntityData | None:
         """
@@ -1463,7 +1558,6 @@ ARGB = JavaClass("net.minecraft.util.ARGB")
 Component = JavaClass("net.minecraft.network.chat.Component")
 ChatFormatting = JavaClass("net.minecraft.ChatFormatting")
 BuiltInRegistries = JavaClass("net.minecraft.core.registries.BuiltInRegistries")
-ResourceLocation = JavaClass("net.minecraft.resources.ResourceLocation")
 ItemStack = JavaClass("net.minecraft.world.item.ItemStack")
 Items = JavaClass("net.minecraft.world.item.Items")
 Item = JavaClass("net.minecraft.world.item.Item")
@@ -1472,7 +1566,6 @@ mc = Minecraft.getInstance()
 
 toggle_key = 301  # F12
 tl = None
-frames = 0
 show = True
 _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool, float, float, list]] = {}
 _ti: int = 0
@@ -1655,8 +1748,6 @@ def _show_item(index: int, enable: bool):
     _items[index] = combine(enable, *old[1:])
     
 def on_hud_render(guiGraphics, tickDeltaManager):
-    global frames
-    
     if not show:
         return
     
@@ -1728,6 +1819,10 @@ def on_hud_render(guiGraphics, tickDeltaManager):
             else:
                 pose_stack.popPose()
 
+if _check_ver("1.21.11"):
+    ResourceLocation = JavaClass("net.minecraft.resources.Identifier")
+else:
+    ResourceLocation = JavaClass("net.minecraft.resources.ResourceLocation")
 
 callback = ManagedCallback(on_hud_render)
 HudRenderCallback.EVENT.register(HudRenderCallback(callback))
@@ -2114,3 +2209,281 @@ class Hud:
         """
         _check_fabric("Hud")
         _show_item(index, enable)
+
+# # # WORLDRENDER # # #
+pyj_wr = eval_pyjinn_script(r"""
+Minecraft = JavaClass("net.minecraft.client.Minecraft")
+RenderType = JavaClass("net.minecraft.client.renderer.RenderType")
+RenderPipelines = JavaClass("net.minecraft.client.renderer.RenderPipelines")
+RenderStateShard = JavaClass("net.minecraft.client.renderer.RenderStateShard")
+PoseStack = JavaClass("com.mojang.blaze3d.vertex.PoseStack")
+DebugRenderer = JavaClass("net.minecraft.client.renderer.debug.DebugRenderer")
+ShapeRenderer = JavaClass("net.minecraft.client.renderer.ShapeRenderer")
+BlockPos = JavaClass("net.minecraft.core.BlockPos")
+AABB = JavaClass("net.minecraft.world.phys.AABB")
+ARGB = JavaClass("net.minecraft.util.ARGB")
+
+mc = Minecraft.getInstance()
+
+# create(String name, int size, boolean hasCrumbling, boolean translucent, RenderPipeline pipeline, RenderLayer$MultiPhaseParameters params)
+NO_CULL_LINES = RenderType.create("no_cull_lines", 1536, False, False, RenderPipelines.LINES, 
+    RenderType.CompositeState.builder()
+        .setLineState(RenderStateShard.DEFAULT_LINE)
+        .setLayeringState(RenderStateShard.NO_LAYERING)
+        .setOutputState(RenderStateShard.OUTLINE_TARGET)
+        .createCompositeState(False)
+)
+
+toggle_key = 301  # F12
+tl = None
+show = True
+
+def _check_ver(ver: str) -> bool:
+    _mc_ver = version_info().minecraft
+    mc_version = [int(v) for v in _mc_ver.split(".")]
+    ver = [int(v) for v in ver.split(".")]
+    check = True
+    for i in range(3):
+        check = check and mc_version[i] >= ver[i]
+    return check
+
+def Float(number):
+    return number.floatValue()
+
+class WorldRender:
+    def __init__(self, max_size: int=1024):
+        self.max_size = max_size
+        self.blocks = {}  # {(x, y, z): (r, g, b, a)}
+        self.texts = {}  # {(x, y, z): (text, r, g, b, a)}
+
+    def add_block(self, x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255):
+        key = (x, y, z)
+        if key in self.blocks:
+            del self.blocks[key]
+        self.blocks[key] = (r, g, b, a)
+
+        if len(self.blocks) > self.max_size:
+            first_key = next(iter(self.blocks))
+            del self.blocks[first_key]
+
+    def remove_block(self, x: int, y: int, z: int):
+        del self.blocks[(x, y, z)]
+    
+    def get_block_list(self):
+        return self.blocks
+
+    def add_text(self, x: float, y: float, z: float, text: str, r: int=255, g: int=255, b: int=255, a: int=255, size: float=1.0):
+        key = (x, y, z)
+        if key in self.texts:
+            del self.texts[key]
+        self.texts[key] = (text, r, g, b, a, size)
+
+        if len(self.texts) > self.max_size:
+            first_key = next(iter(self.texts))
+            del self.texts[first_key]
+
+    def remove_text(self, x: float, y: float, z: float):
+        del self.texts[(x, y, z)]
+    
+    def get_text_list(self):
+        return self.texts
+    
+    def show_wr(self, enable: bool):
+        global show
+
+        show = enable
+
+    def use_toggle_key(self, enable: bool):
+        global tl
+        
+        if enable and tl is None:
+                tl = add_event_listener("key", on_press_key)
+        else:
+            if tl is not None:
+                remove_listener(tl)
+                tl = None
+
+    def set_toggle_key(self, tk: int):
+        global toggle_key
+        
+        toggle_key = tk
+
+
+_wr = WorldRender()
+
+def on_press_key(event):
+    global show
+
+    if event.action == 0 and event.key == toggle_key:
+        show = not show
+
+def on_world_render(event: RenderEvent) -> bool:
+    if not show:
+        return
+    
+    world_render_context = event.context
+    
+    multi_buffer_source = world_render_context.consumers() # -> MultiBufferSource / VertexConsumerProvider
+    if multi_buffer_source is None:
+        return True
+
+    poseStack = PoseStack()
+    vertex_consumer = multi_buffer_source.getBuffer(NO_CULL_LINES) # -> BufferBuilder
+
+    cam = world_render_context.camera()
+    cam_pos = cam.getPosition()
+    
+    text_list = _wr.get_text_list()
+    for text_pos in text_list:
+        poseStack.pushPose()
+        poseStack.translate(text_pos[0] - cam_pos.x, text_pos[1] - cam_pos.y, text_pos[2] - cam_pos.z)
+        poseStack.scale(Float(0.025), Float(0.025), Float(0.025))
+        text, r, g, b, a, size = text_list[text_pos]
+        # color(int alpha, int red, int green, int blue)
+        color: int = ARGB.color(a, r, g, b)
+        # renderFloatingText(PoseStack matrices, MultiBufferSource vertexConsumers, String string, int x, int y, int z, int color)
+        # renderFloatingText(PoseStack matrices, MultiBufferSource vertexConsumers, String string, double x, double y, double z, int color, float size, boolean center, float offset, boolean visibleThroughObjects)
+        DebugRenderer.renderFloatingText(poseStack, multi_buffer_source, text, *text_pos, color, size, True, 0.0, True)
+        poseStack.popPose()
+    
+    block_list = _wr.get_block_list()
+    for block_pos in block_list:
+        poseStack.pushPose()
+        poseStack.translate(-cam_pos.x, -cam_pos.y, -cam_pos.z)
+        if _check_ver("1.21.9"):
+            pose = poseStack.last()
+        else:
+            pose = poseStack
+
+        r, g, b, a = block_list[block_pos]
+        box = AABB(BlockPos(*block_pos))
+        # renderLineBox(PoseStack matrices, VertexConsumer vertexConsumers, AABB box, float red, float green, float blue, float alpha)
+        ShapeRenderer.renderLineBox(pose, vertex_consumer, box, Float(r/255), Float(g/255), Float(b/255), Float(a/255))
+        poseStack.popPose()
+
+
+add_event_listener("render", on_world_render)
+
+""")
+
+_wr = pyj_wr.get("_wr")
+
+class WorldRender:
+    @staticmethod
+    def add_block(x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255):
+        """
+        Add a wireframe block at the specified integer world coordinates.
+
+        Args:
+            x (int): X coordinate of the block (integer grid position).
+            y (int): Y coordinate of the block (integer grid position).
+            z (int): Z coordinate of the block (integer grid position).
+            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+
+        Returns:
+            None
+        """
+        _wr.add_block(x, y, z, r, g, b, a)
+    
+    @staticmethod
+    def remove_block(x: int, y: int, z: int):
+        """
+        Remove a wireframe block at the specified integer world coordinates.
+
+        Args:
+            x (int): X coordinate of the block (integer grid position).
+            y (int): Y coordinate of the block (integer grid position).
+            z (int): Z coordinate of the block (integer grid position).
+
+        Returns:
+            None
+        """
+        _wr.remove_block(x, y, z)
+    
+    @staticmethod
+    def get_block_list():
+        """
+        Returns the internal mapping of wireframe blocks currently tracked by the WorldRender.
+
+        Returns:
+            dict: Mapping where keys are (x, y, z) integer tuples and values are (r, g, b, a) tuples
+                  describing the color and alpha for each wireframe block.
+        """
+        return _wr.get_block_list()
+
+    @staticmethod
+    def add_text(x: float, y: float, z: float, text: str, r: int=255, g: int=255, b: int=255, a: int=255, size: float=1.0):
+        """
+        Add a floating text label at the specified world coordinates.
+
+        Args:
+            x (float): X coordinate in world space.
+            y (float): Y coordinate in world space.
+            z (float): Z coordinate in world space.
+            text (str): The text to render.
+            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+            size (float, optional): Scale/size multiplier for the rendered text. Defaults to 1.0.
+
+        Returns:
+            None
+        """
+        _wr.add_text(x, y, z, text, r, g, b, a, size)
+    
+    @staticmethod
+    def remove_text(x: float, y: float, z: float):
+        """
+        Remove a previously added floating text label at the specified world coordinates.
+
+        Args:
+            x (float): X coordinate in world space.
+            y (float): Y coordinate in world space.
+            z (float): Z coordinate in world space.
+
+        Returns:
+            None
+        """
+        _wr.remove_text(x, y, z)
+    
+    @staticmethod
+    def get_text_list():
+        """
+        Returns the internal mapping of floating texts currently tracked by the WorldRender.
+
+        Returns:
+            dict: Mapping where keys are (x, y, z) tuples (floats) and values are tuples
+                  (text, r, g, b, a, size) describing each floating text entry.
+        """
+        return _wr.get_text_list()
+
+    @staticmethod
+    def show_wr(enable: bool):
+        """
+        Enables or disables display of all wr content.
+        Args:
+            enable (bool): True to show, False to hide.
+        """
+        _wr.show_wr(enable)
+
+    @staticmethod
+    def use_toggle_key(enable: bool):
+        """
+        Enables or disables the wr toggle key (default F12).
+        Args:
+            enable (bool): True to allow toggling wr with key.
+        """
+        _wr.use_toggle_key(enable)
+
+    @staticmethod
+    def set_toggle_key(toggle_key: int):
+        """
+        Sets the key code used to toggle wr display (GLFW key code).
+        Args:
+            toggle_key (int): GLFW key code to use for toggling.
+        """
+        _wr.set_toggle_key(toggle_key)
