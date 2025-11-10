@@ -2,7 +2,7 @@
 
 **Version:** 0.17.0-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-11-07
+**Date:** 2025-11-11
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.
@@ -37,7 +37,7 @@ First you need to download minescript_plus.py and place it in the /minescript fo
 Import the module in your script:
 
 ```python
-from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Trading, Hud, Util, Keybind, Event
+from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Trading, Hud, WorldRender, Util, Keybind, Event
 ```
 
 You don't need to import all the classes, just the ones you need. \
@@ -479,7 +479,7 @@ Hud.set_item_count(item_id, str(current_count + 5))
 
 Methods for rendering wireframe blocks and floating texts in the world (3D debug rendering).
 
-- **add_block(x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255) -> None**  
+- **add_box(x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255) -> None**  
   Adds/Updates a wireframe block at the given integer world coordinates. Color channels and alpha are 0–255.
 
 - **remove_block(x: int, y: int, z: int) -> None**  
@@ -512,7 +512,7 @@ Methods for rendering wireframe blocks and floating texts in the world (3D debug
 from minescript_plus import WorldRender
 
 # add a semi-transparent red wireframe at (10, 64, 10)
-WorldRender.add_block(10, 64, 10, r=255, g=0, b=0, a=128)
+WorldRender.add_box(10, 64, 10, r=255, g=0, b=0, a=128)
 
 # add a floating yellow label above the block (previous wirefame)
 WorldRender.add_text(10.5, 65.5, 10.5, "Sample", r=255, g=255, b=0, a=255, size=1.0)
@@ -601,6 +601,16 @@ Util.play_sound(Util.get_soundevents().BELL_BLOCK, Util.get_soundsource().BLOCKS
   Returns the `SoundSource` class from Minecraft, which can be used to get a sound_source for the `play_sound()` method.  
   See all available sound_sources [here](https://mappings.dev/1.21.8/net/minecraft/sounds/SoundSource.html).
 
+- **show_toast(title: str, desc: str)**  
+  Display a Minecraft client toast (small notification).  
+  - title: Title text for the toast.  
+  - desc: Description/body text (may include line breaks).  
+  Example:
+  ```python
+  from minescript_plus import Util
+  Util.show_toast("My cool script", "Information saved correctly.")
+  ```
+
 ---
 
 ## Events
@@ -684,6 +694,39 @@ kb = Keybind()
 kb.set_keybind(294, on_f5)
 # or with glfw_key_codes.py (remember to import it)
 kb.set_keybind(GLFWKey.F5, on_f5)
+```
+
+---
+
+### Data
+
+Persistent data storage. Variables are stored per-script (filename-based .pkl) in `/minescript/data/`.
+
+- Data.VarType (IntEnum)  
+  - PERMANENT — stored until removed.  
+  - SESSION — tied to a client session (stored with a session_id). If session_id is omitted the current window handle is used, and it'll work until Minecraft is closed.  
+  - EXPIRABLE — stored with an expiry timestamp and automatically removed when expired.
+
+- Data.set_var(name: str, value: Any, var_type: int = VarType.PERMANENT, expire_time: int = 0, session_id: int = -1) -> None  
+  Store a value under name. For EXPIRABLE variables, pass expire_time (time-to-live in seconds). For SESSION variables provide session_id (or omit to use the current client window handle). 
+
+- Data.get_var(name: str, session_id: int = -1) -> Any | None  
+  Retrieve a stored value. EXPIRABLE entries are validated against their expiry and removed if expired. SESSION entries must match the provided session_id (or the current window handle) or they are considered invalid and removed. Returns None if value not present or invalid.
+
+Example:
+```python
+# Save a permanent variable
+Data.set_var("my_key", {"foo": 1})
+
+# Save an expirable variable for 1 hour
+Data.set_var("temp", 42, var_type=Data.VarType.EXPIRABLE, expire_time=3600)
+
+# Save a session-scoped value
+Data.set_var("session_state", {"x": 1}, var_type=Data.VarType.SESSION)
+
+# Read values
+val = Data.get_var("my_key")
+temp = Data.get_var("temp")
 ```
 
 ---

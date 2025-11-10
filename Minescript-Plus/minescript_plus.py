@@ -2,7 +2,7 @@
     Minescript Plus
     Version: 0.17.0-alpha
     Author: RazrCraft
-    Date: 2025-11-07
+    Date: 2025-11-11
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using lib_java and other libraries.
@@ -19,11 +19,14 @@
 """
 import asyncio
 import threading
-from os import path
+from os import path, makedirs
 from sys import exit, stderr, version # pylint: disable=W0622
 from sys import version_info as svi
-from time import sleep
+from time import sleep, time
+import inspect
+import pickle
 from math import floor
+from enum import IntEnum
 from typing import Callable, Literal, Any
 from dataclasses import dataclass, asdict
 from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock, 
@@ -59,6 +62,7 @@ if not path.exists(_map_path1) or not path.exists(_map_path2):
     exit(1)
 
 fabric = ver_info().minecraft_class_name == "net.minecraft.class_310"
+ns: bool = False
 
 @dataclass
 class VersionInfo(VF):
@@ -72,7 +76,6 @@ def version_info():
 EventMode = Literal["flag", "callback"]
 EventName = Literal["on_title", "on_subtitle", "on_actionbar", "on_open_screen"]
 _events = {}
-
 
 class EventDefinition:
     def __init__(self, name: str, mode: EventMode, flag: bool = False, condition: Callable | None = None, interval: float | None = None):
@@ -615,7 +618,7 @@ with render_loop:
             """
             title = _get_private_field(mc.gui, "title")
             if title is not None:
-                title = title.tryCollapseToString()
+                title = title.getString()
             return title  # type: ignore
 
         @staticmethod
@@ -718,6 +721,7 @@ with render_loop:
                 None
             """
             mc.gui.clearTitles()
+            
     # End render_loop
 
 # # # KEY # # #
@@ -1516,6 +1520,7 @@ class Util:
         """
         Plays a sound on the client side.
 
+        Args:
             sound (optional): The sound event to play. Should be an instance from the SoundEvents class.
                 Defaults to EXPERIENCE_ORB_PICKUP if None is provided.
             sound_source (optional): The source of the sound. Should be an instance from the SoundSource class.
@@ -1548,6 +1553,33 @@ class Util:
         All sounds from this class here: https://mappings.dev/1.21.8/net/minecraft/sounds/SoundSource.html
         """
         return SoundSource
+    
+    @staticmethod
+    def show_toast(title: str, desc: str):
+        """
+        Display a Minecraft client toast notification.
+        
+        Args:
+            title (str):
+                Title text for the toast.
+            desc (str):
+                Description/body text for the toast; may include line breaks.
+        """
+        pyj_t = eval_pyjinn_script(r"""
+Minecraft = JavaClass("net.minecraft.client.Minecraft")
+Component = JavaClass("net.minecraft.network.chat.Component")
+ToastManager = JavaClass("net.minecraft.client.gui.components.toasts.ToastManager")
+SystemToast = JavaClass("net.minecraft.client.gui.components.toasts.SystemToast")
+
+mc = Minecraft.getInstance()
+
+def _show_toast(title: str, desc: str):
+    title = Component.literal(title)
+    desc = Component.literal(desc)
+    mc.getToastManager().addToast(SystemToast.multiline(mc, SystemToast.SystemToastId.PERIODIC_NOTIFICATION, title, desc))
+        """)
+        pyj_t.get("_show_toast")(title, desc)
+
 
 # # # HUD # # #
 if fabric:
@@ -2253,24 +2285,24 @@ def Float(number):
 class WorldRender:
     def __init__(self, max_size: int=1024):
         self.max_size = max_size
-        self.blocks = {}  # {(x, y, z): (r, g, b, a)}
+        self.boxes = {}  # {(x, y, z): (r, g, b, a)}
         self.texts = {}  # {(x, y, z): (text, r, g, b, a)}
 
-    def add_block(self, x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255):
+    def add_box(self, x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255):
         key = (x, y, z)
-        if key in self.blocks:
-            del self.blocks[key]
-        self.blocks[key] = (r, g, b, a)
+        if key in self.boxes:
+            del self.boxes[key]
+        self.boxes[key] = (r, g, b, a)
 
-        if len(self.blocks) > self.max_size:
-            first_key = next(iter(self.blocks))
-            del self.blocks[first_key]
+        if len(self.boxes) > self.max_size:
+            first_key = next(iter(self.boxes))
+            del self.boxes[first_key]
 
-    def remove_block(self, x: int, y: int, z: int):
-        del self.blocks[(x, y, z)]
+    def remove_box(self, x: int, y: int, z: int):
+        del self.boxes[(x, y, z)]
     
-    def get_block_list(self):
-        return self.blocks
+    def get_box_list(self):
+        return self.boxes
 
     def add_text(self, x: float, y: float, z: float, text: str, r: int=255, g: int=255, b: int=255, a: int=255, size: float=1.0):
         key = (x, y, z)
@@ -2341,13 +2373,12 @@ def on_world_render(event: RenderEvent) -> bool:
         text, r, g, b, a, size = text_list[text_pos]
         # color(int alpha, int red, int green, int blue)
         color: int = ARGB.color(a, r, g, b)
-        # renderFloatingText(PoseStack matrices, MultiBufferSource vertexConsumers, String string, int x, int y, int z, int color)
         # renderFloatingText(PoseStack matrices, MultiBufferSource vertexConsumers, String string, double x, double y, double z, int color, float size, boolean center, float offset, boolean visibleThroughObjects)
-        DebugRenderer.renderFloatingText(poseStack, multi_buffer_source, text, *text_pos, color, size, True, 0.0, True)
+        DebugRenderer.renderFloatingText(poseStack, multi_buffer_source, text, *text_pos, color, Float(size), True, 0.0, True)
         poseStack.popPose()
     
-    block_list = _wr.get_block_list()
-    for block_pos in block_list:
+    box_list = _wr.get_box_list()
+    for box_pos in box_list:
         poseStack.pushPose()
         poseStack.translate(-cam_pos.x, -cam_pos.y, -cam_pos.z)
         if _check_ver("1.21.9"):
@@ -2355,8 +2386,8 @@ def on_world_render(event: RenderEvent) -> bool:
         else:
             pose = poseStack
 
-        r, g, b, a = block_list[block_pos]
-        box = AABB(BlockPos(*block_pos))
+        r, g, b, a = box_list[box_pos]
+        box = AABB(BlockPos(*box_pos))
         # renderLineBox(PoseStack matrices, VertexConsumer vertexConsumers, AABB box, float red, float green, float blue, float alpha)
         ShapeRenderer.renderLineBox(pose, vertex_consumer, box, Float(r/255), Float(g/255), Float(b/255), Float(a/255))
         poseStack.popPose()
@@ -2370,9 +2401,9 @@ _wr = pyj_wr.get("_wr")
 
 class WorldRender:
     @staticmethod
-    def add_block(x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255):
+    def add_box(x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255):
         """
-        Add a wireframe block at the specified integer world coordinates.
+        Add a box at the specified integer world coordinates.
 
         Args:
             x (int): X coordinate of the block (integer grid position).
@@ -2386,12 +2417,12 @@ class WorldRender:
         Returns:
             None
         """
-        _wr.add_block(x, y, z, r, g, b, a)
+        _wr.add_box(x, y, z, r, g, b, a)
     
     @staticmethod
-    def remove_block(x: int, y: int, z: int):
+    def remove_box(x: int, y: int, z: int):
         """
-        Remove a wireframe block at the specified integer world coordinates.
+        Remove a box at the specified integer world coordinates.
 
         Args:
             x (int): X coordinate of the block (integer grid position).
@@ -2401,18 +2432,18 @@ class WorldRender:
         Returns:
             None
         """
-        _wr.remove_block(x, y, z)
+        _wr.remove_box(x, y, z)
     
     @staticmethod
-    def get_block_list():
+    def get_box_list():
         """
-        Returns the internal mapping of wireframe blocks currently tracked by the WorldRender.
+        Returns the internal mapping of boxes currently tracked by the WorldRender.
 
         Returns:
             dict: Mapping where keys are (x, y, z) integer tuples and values are (r, g, b, a) tuples
-                  describing the color and alpha for each wireframe block.
+                  describing the color and alpha for each box.
         """
-        return _wr.get_block_list()
+        return _wr.get_box_list()
 
     @staticmethod
     def add_text(x: float, y: float, z: float, text: str, r: int=255, g: int=255, b: int=255, a: int=255, size: float=1.0):
@@ -2465,6 +2496,7 @@ class WorldRender:
     def show_wr(enable: bool):
         """
         Enables or disables display of all wr content.
+        
         Args:
             enable (bool): True to show, False to hide.
         """
@@ -2474,6 +2506,7 @@ class WorldRender:
     def use_toggle_key(enable: bool):
         """
         Enables or disables the wr toggle key (default F12).
+        
         Args:
             enable (bool): True to allow toggling wr with key.
         """
@@ -2483,7 +2516,133 @@ class WorldRender:
     def set_toggle_key(toggle_key: int):
         """
         Sets the key code used to toggle wr display (GLFW key code).
+        
         Args:
             toggle_key (int): GLFW key code to use for toggling.
         """
         _wr.set_toggle_key(toggle_key)
+
+class Data:
+    _data_path = "minescript/data"
+
+    class VarType(IntEnum):
+        PERMANENT = 0
+        SESSION = 1
+        EXPIRABLE = 2
+
+    @staticmethod
+    def _get_db_name():
+        for frame_info in inspect.stack():
+            if not frame_info.filename.startswith('<') and frame_info.filename != __file__:
+                filename = path.basename(frame_info.filename)
+                return filename.removesuffix(".py") + ".pkl"
+        return None
+
+    if not path.exists(_data_path):
+        makedirs(_data_path)
+
+    @staticmethod
+    def _get_db_path(msp: bool) -> str:
+        if msp:
+            return Data._data_path + "/" + "minescript_plus.pkl"
+        else:
+            db_file = Data._get_db_name() or 'data_store.pkl'
+            return Data._data_path + "/" + db_file
+
+    @staticmethod
+    def _load_db(db_path: str) -> dict:
+        if path.exists(db_path):
+            try:
+                with open(db_path, 'rb') as f:
+                    return pickle.load(f)
+            except (IOError, pickle.UnpicklingError, EOFError):
+                return {}
+        return {}
+    
+    @staticmethod
+    def _save_db(db_path: str, data: dict):
+        with open(db_path, 'wb') as f:
+            pickle.dump(data, f)
+
+    @staticmethod
+    def set_var(name: str, value: Any, var_type: int = VarType.PERMANENT, expire_time: int=0, session_id: int=-1):
+        """
+        Set a variable in the persistent Data store.
+        
+        Args:
+            name (str): The key/name of the variable to set.
+            value (Any): The value to store under the given name.
+            var_type (int, optional): One of the Data.VarType constants indicating lifetime/semantics of the variable. 
+                Defaults to VarType.PERMANENT.
+            expire_time (int, optional): For Data.VarType.EXPIRABLE variables, the time-to-live in seconds.
+                Ignored for other var types. Defaults to 0.
+            session_id (int, optional): For Data.VarType.SESSION variables, the identifier of the session this variable
+                belongs to.
+                Defaults to -1 (will use the current client window handle and it'll work until Minecraft is closed).
+        """
+        if var_type == Data.VarType.SESSION and session_id == -1:
+            #raise ValueError("Error: VarType.SESSION without session_id")
+            session_id = mc.getWindow().handle().toString() # long # type: ignore
+            
+        db_path = Data._get_db_path(path.basename(inspect.stack()[1].filename) == "minescript_plus.py" and not ns)
+        data = Data._load_db(db_path)
+        
+        metadata = {
+            'value': value,
+            'type': var_type,
+        }
+        if var_type == Data.VarType.EXPIRABLE:
+            metadata['created_at'] = time()
+            metadata['expires_at'] = time() + expire_time
+        if var_type == Data.VarType.SESSION:
+            metadata['session_id'] = session_id
+        
+        data[name] = metadata
+        Data._save_db(db_path, data)
+
+    @staticmethod
+    def get_var(name: str, session_id: int=-1) -> Any:
+        """
+        Retrieve a stored variable from the persistent Data store.
+        
+        Args:
+            name (str): The key/name of the variable to retrieve.
+            session_id (int, optional): Session identifier used to validate SESSION-scoped variables. 
+                Defaults to -1 (will use the current client window handle and it'll work until Minecraft is closed).
+        Returns:
+            Any or None
+            The stored value associated with `name` (metadata['value']) if present and
+            valid; otherwise None.
+        """
+        db_path = Data._get_db_path(path.basename(inspect.stack()[1].filename) == "minescript_plus.py" and not ns)
+        data = Data._load_db(db_path)
+        
+        if name in data:
+            metadata = data[name]
+            var_type = metadata.get('type')
+            
+            if var_type == Data.VarType.EXPIRABLE:
+                expires_at = metadata.get('expires_at')
+                
+                if expires_at is not None and time() > expires_at:
+                    del data[name]
+                    Data._save_db(db_path, data)
+                    return None
+            
+            if var_type == Data.VarType.SESSION:
+                if session_id == -1:
+                    session_id = mc.getWindow().handle().toString() # long # type: ignore
+                if session_id != metadata.get('session_id'):
+                    del data[name]
+                    Data._save_db(db_path, data)
+                    return None
+            
+            return metadata['value']
+        
+        return None
+
+ns = Data.get_var("SID")
+if ns is None:
+    Data.set_var("SID", True, Data.VarType.SESSION)
+    ns = True
+    Util.show_toast("Minescript Plus", "You are using Minescript Plus v" + _ver)
