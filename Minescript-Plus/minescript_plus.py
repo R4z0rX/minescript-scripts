@@ -2,10 +2,10 @@
     Minescript Plus
     Version: 0.17.0-alpha
     Author: RazrCraft
-    Date: 2025-11-11
+    Date: 2025-11-13
 
     User-friendly API for scripts that adds extra functionality to the
-    Minescript mod, using lib_java and other libraries.
+    Minescript mod, using java built-in module and other libraries.
     This module should be imported by other scripts and not run directly.
 
     Usage: Similar to Minescript, import minescript_plus  # from Python script
@@ -1554,18 +1554,19 @@ class Util:
         """
         return SoundSource
     
-    @staticmethod
-    def show_toast(title: str, desc: str):
-        """
-        Display a Minecraft client toast notification.
-        
-        Args:
-            title (str):
-                Title text for the toast.
-            desc (str):
-                Description/body text for the toast; may include line breaks.
-        """
-        pyj_t = eval_pyjinn_script(r"""
+    with render_loop:
+        @staticmethod
+        def show_toast(title: str, desc: str):
+            """
+            Display a Minecraft client toast notification.
+            
+            Args:
+                title (str):
+                    Title text for the toast.
+                desc (str):
+                    Description/body text for the toast; may include line breaks.
+            """
+            pyj_t = eval_pyjinn_script(r"""
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
 Component = JavaClass("net.minecraft.network.chat.Component")
 ToastManager = JavaClass("net.minecraft.client.gui.components.toasts.ToastManager")
@@ -1577,8 +1578,8 @@ def _show_toast(title: str, desc: str):
     title = Component.literal(title)
     desc = Component.literal(desc)
     mc.getToastManager().addToast(SystemToast.multiline(mc, SystemToast.SystemToastId.PERIODIC_NOTIFICATION, title, desc))
-        """)
-        pyj_t.get("_show_toast")(title, desc)
+            """)
+            pyj_t.get("_show_toast")(title, desc)
 
 
 # # # HUD # # #
@@ -2286,7 +2287,7 @@ class WorldRender:
     def __init__(self, max_size: int=1024):
         self.max_size = max_size
         self.boxes = {}  # {(x, y, z): (r, g, b, a)}
-        self.texts = {}  # {(x, y, z): (text, r, g, b, a)}
+        self.texts = {}  # {(x, y, z): (text, r, g, b, a, size)}
 
     def add_box(self, x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255):
         key = (x, y, z)
@@ -2343,6 +2344,57 @@ class WorldRender:
 
 _wr = WorldRender()
 
+def render_text(context, text, text_pos, rgba, size, no_cull=False):
+    multi_buffer_source = context.consumers() # -> MultiBufferSource / VertexConsumerProvider
+    
+    if multi_buffer_source is None:
+        return True
+    
+    cam = context.camera()
+    cam_pos = cam.getPosition()
+    poseStack = PoseStack()
+    
+    poseStack.pushPose()
+    poseStack.translate(text_pos[0] - cam_pos.x, text_pos[1] - cam_pos.y, text_pos[2] - cam_pos.z)
+    poseStack.scale(Float(0.025), Float(0.025), Float(0.025))
+    
+    r, g, b, a = rgba
+    # color(int alpha, int red, int green, int blue)
+    color: int = ARGB.color(a, r, g, b)
+    # renderFloatingText(PoseStack matrices, MultiBufferSource vertexConsumers, String string, double x, double y, double z, int color, float size, boolean center, float offset, boolean visibleThroughObjects)
+    DebugRenderer.renderFloatingText(poseStack, multi_buffer_source, text, *text_pos, color, Float(size), True, 0.0, no_cull)
+    
+    poseStack.popPose()
+    
+def render_box(context, box_pos, rgba, no_cull=False):
+    multi_buffer_source = context.consumers() # -> MultiBufferSource / VertexConsumerProvider
+    
+    if multi_buffer_source is None:
+        return True
+
+    if no_cull:
+        vertex_consumer = multi_buffer_source.getBuffer(NO_CULL_LINES) # -> BufferBuilder
+    else:
+        vertex_consumer = multi_buffer_source.getBuffer(RenderType.lines()) # -> BufferBuilder
+
+    cam = context.camera()
+    cam_pos = cam.getPosition()
+    poseStack = PoseStack()
+
+    poseStack.pushPose()
+    poseStack.translate(-cam_pos.x, -cam_pos.y, -cam_pos.z)
+    if _check_ver("1.21.9"):
+        pose = poseStack.last()
+    else:
+        pose = poseStack
+
+    r, g, b, a = rgba
+    box = AABB(BlockPos(*box_pos))
+    # renderLineBox(PoseStack matrices, VertexConsumer vertexConsumers, AABB box, float red, float green, float blue, float alpha)
+    ShapeRenderer.renderLineBox(pose, vertex_consumer, box, Float(r/255), Float(g/255), Float(b/255), Float(a/255))
+    
+    poseStack.popPose()
+
 def on_press_key(event):
     global show
 
@@ -2355,43 +2407,16 @@ def on_world_render(event: RenderEvent) -> bool:
     
     world_render_context = event.context
     
-    multi_buffer_source = world_render_context.consumers() # -> MultiBufferSource / VertexConsumerProvider
-    if multi_buffer_source is None:
-        return True
-
-    poseStack = PoseStack()
-    vertex_consumer = multi_buffer_source.getBuffer(NO_CULL_LINES) # -> BufferBuilder
-
-    cam = world_render_context.camera()
-    cam_pos = cam.getPosition()
+    render_box(world_render_context, (0, 0, 0), (0, 0, 0, 0), False)
     
     text_list = _wr.get_text_list()
     for text_pos in text_list:
-        poseStack.pushPose()
-        poseStack.translate(text_pos[0] - cam_pos.x, text_pos[1] - cam_pos.y, text_pos[2] - cam_pos.z)
-        poseStack.scale(Float(0.025), Float(0.025), Float(0.025))
         text, r, g, b, a, size = text_list[text_pos]
-        # color(int alpha, int red, int green, int blue)
-        color: int = ARGB.color(a, r, g, b)
-        # renderFloatingText(PoseStack matrices, MultiBufferSource vertexConsumers, String string, double x, double y, double z, int color, float size, boolean center, float offset, boolean visibleThroughObjects)
-        DebugRenderer.renderFloatingText(poseStack, multi_buffer_source, text, *text_pos, color, Float(size), True, 0.0, True)
-        poseStack.popPose()
+        render_text(world_render_context, text, text_pos, (r, g, b, a), size, True)
     
     box_list = _wr.get_box_list()
     for box_pos in box_list:
-        poseStack.pushPose()
-        poseStack.translate(-cam_pos.x, -cam_pos.y, -cam_pos.z)
-        if _check_ver("1.21.9"):
-            pose = poseStack.last()
-        else:
-            pose = poseStack
-
-        r, g, b, a = box_list[box_pos]
-        box = AABB(BlockPos(*box_pos))
-        # renderLineBox(PoseStack matrices, VertexConsumer vertexConsumers, AABB box, float red, float green, float blue, float alpha)
-        ShapeRenderer.renderLineBox(pose, vertex_consumer, box, Float(r/255), Float(g/255), Float(b/255), Float(a/255))
-        poseStack.popPose()
-
+        render_box(world_render_context, box_pos, box_list[box_pos], True)
 
 add_event_listener("render", on_world_render)
 
@@ -2645,4 +2670,5 @@ ns = Data.get_var("SID")
 if ns is None:
     Data.set_var("SID", True, Data.VarType.SESSION)
     ns = True
-    Util.show_toast("Minescript Plus", "You are using Minescript Plus v" + _ver)
+    with render_loop:
+        Util.show_toast("Minescript Plus", "You are using Minescript Plus v" + _ver)
