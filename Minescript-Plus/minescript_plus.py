@@ -299,6 +299,11 @@ SoundEvents = JavaClass("net.minecraft.sounds.SoundEvents")
 SoundSource = JavaClass("net.minecraft.sounds.SoundSource")
 LightLayer = JavaClass("net.minecraft.world.level.LightLayer")
 
+InteractionHand = JavaClass("net.minecraft.world.InteractionHand")
+BlockHitResult = JavaClass("net.minecraft.world.phys.BlockHitResult")
+Vec3 = JavaClass("net.minecraft.world.phys.Vec3")
+Direction = JavaClass("net.minecraft.core.Direction")
+
 mappings = Minescript.mappingsLoader.get()
 mc = Minecraft.getInstance()
 
@@ -948,6 +953,79 @@ class Player:
             float: The player's current XP bar progress (0.0 to 1.0).
         """
         return mc.player.experienceProgress # type: ignore
+    
+    @staticmethod
+    def set_player_vel(velocity: tuple):
+        """
+        ## WARNING: This will get you flagged by anticheat!
+
+        Sets the velocity of the player.
+
+        Args:
+            velocity: (x, y, z)
+        Time sensitive applications should be done in pyjinn instead of python.
+        """
+        x, y, z = velocity
+        mc.player.setDeltaMovement(x,y,z)
+    
+    @staticmethod
+    def add_player_vel(velocity: tuple):
+        """
+        ## WARNING: This will get you flagged by anticheat!
+
+        Adds velocity to the player.
+
+        Args:
+            velocity: (x, y, z)
+
+        Time sensitive applications should be done in pyjinn instead of python.
+        """
+        x, y, z = velocity
+        mc.player.addDeltaMovement(x,y,z)
+    
+    def send_place_packet(position: tuple):
+
+        """
+        ## WARNING: This will get you flagged by anticheat!
+
+        Places the block in your main hand at the selected coordinates.
+        
+        Args:
+            position: (x,y,z) Tuple for the location of the placement
+        
+        Time sensitive applications should be done in pyjinn instead of python.
+        """
+
+        
+        x = int(floor(position[0]))
+        y = int(floor(position[1]))
+        z = int(floor(position[2]))
+        try: 
+            mc.gameMode.useItemOn(
+                    mc.player, 
+                    InteractionHand.MAIN_HAND, 
+                    BlockHitResult(
+                        Vec3(*position), 
+                        Direction.UP, 
+                        BlockPos(x,y,z),
+                        False
+                        )
+                    )
+        except: pass
+    
+    def send_position_packet(position: tuple):
+        """
+        ## WARNING: This will get you flagged by anticheat!
+
+        Sets your position to the selected coordinates.
+
+        Args:
+            position: (x,y,z) Tuple for the location of the teleport
+
+        Time sensitive applications should be done in pyjinn instead of python.
+        """
+        x, y, z = position
+        Player.setPos(x, y, z)
 
 # # # SERVER # # #
 
