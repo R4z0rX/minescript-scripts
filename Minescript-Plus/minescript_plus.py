@@ -307,6 +307,8 @@ Direction = JavaClass("net.minecraft.core.Direction")
 mappings = Minescript.mappingsLoader.get()
 mc = Minecraft.getInstance()
 
+mcUtil = JavaClass("net.minecraft.Util")
+
 mc.gui.setOverlayMessage(None, False)
 
 """
@@ -1631,7 +1633,13 @@ class Util:
         All sounds from this class here: https://mappings.dev/1.21.8/net/minecraft/sounds/SoundSource.html
         """
         return SoundSource
-    
+
+    @staticmethod
+    def get_platform():
+        """
+        Returns a string indicating the platform minecraft is running on.
+        """
+        return mcUtil.getPlatform()
     with render_loop:
         @staticmethod
         def show_toast(title: str, desc: str):
