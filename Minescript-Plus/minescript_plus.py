@@ -298,6 +298,7 @@ BlockPos = JavaClass("net.minecraft.core.BlockPos")
 SoundEvents = JavaClass("net.minecraft.sounds.SoundEvents")
 SoundSource = JavaClass("net.minecraft.sounds.SoundSource")
 LightLayer = JavaClass("net.minecraft.world.level.LightLayer")
+MC_Util = JavaClass("net.minecraft.Util")
 
 InteractionHand = JavaClass("net.minecraft.world.InteractionHand")
 BlockHitResult = JavaClass("net.minecraft.world.phys.BlockHitResult")
@@ -306,8 +307,6 @@ Direction = JavaClass("net.minecraft.core.Direction")
 
 mappings = Minescript.mappingsLoader.get()
 mc = Minecraft.getInstance()
-
-mcUtil = JavaClass("net.minecraft.Util")
 
 mc.gui.setOverlayMessage(None, False)
 
@@ -1639,7 +1638,8 @@ class Util:
         """
         Returns a string indicating the platform minecraft is running on.
         """
-        return mcUtil.getPlatform()
+        return MC_Util.getPlatform()
+    
     with render_loop:
         @staticmethod
         def show_toast(title: str, desc: str):
