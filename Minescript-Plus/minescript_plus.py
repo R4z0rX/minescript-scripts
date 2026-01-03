@@ -298,6 +298,7 @@ BlockPos = JavaClass("net.minecraft.core.BlockPos")
 SoundEvents = JavaClass("net.minecraft.sounds.SoundEvents")
 SoundSource = JavaClass("net.minecraft.sounds.SoundSource")
 LightLayer = JavaClass("net.minecraft.world.level.LightLayer")
+MC_Util = JavaClass("net.minecraft.Util")
 
 InteractionHand = JavaClass("net.minecraft.world.InteractionHand")
 BlockHitResult = JavaClass("net.minecraft.world.phys.BlockHitResult")
@@ -1631,6 +1632,13 @@ class Util:
         All sounds from this class here: https://mappings.dev/1.21.8/net/minecraft/sounds/SoundSource.html
         """
         return SoundSource
+
+    @staticmethod
+    def get_platform():
+        """
+        Returns a string indicating the platform minecraft is running on.
+        """
+        return MC_Util.getPlatform()
     
     with render_loop:
         @staticmethod
