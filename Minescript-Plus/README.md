@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.16.0-alpha  
+**Version:** 0.16.2-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-10-12
+**Date:** 2026-03-04
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.
@@ -12,7 +12,7 @@ This module should be imported by other scripts and not run directly.
 ## Requirements
 
 **For Minescript Plus v0.13-alpha or newer:**
-* Minecraft (any version supported by Minescript)
+* Minecraft 1.21.5 - 1.21.11
 * Minescript 5.0b6 or newer
 * Python 3.10 or higher
 * java module (already included with Minescript)
@@ -37,7 +37,7 @@ First you need to download minescript_plus.py and place it in the /minescript fo
 Import the module in your script:
 
 ```python
-from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Trading, Hud, Util, Keybind, Event
+from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Trading, Hud, Util, Keybind, Event, input
 ```
 
 You don't need to import all the classes, just the ones you need. \
@@ -102,6 +102,10 @@ if slot is not None:
 - **count_total(inventory: list[ItemStack], item_id: int) -> int**  
   Counts the total number of items with a specific item ID in the given inventory.  
   *Returns:* The total count of items with the specified item ID.
+
+- **get_lore(item: ItemStack=None) -> str | None**  
+   Gets the lore text of the specified item.  
+  *Returns:* The lore of the item, or None if it doesn't have any.
 
 ---
 
@@ -284,9 +288,19 @@ Methods for retrieving world information.
 - **get_day_time() -> int**  
   Returns the current day time in ticks.
 
-- **get_targeted_sign_text() -> list[str]**  
+- **get_sign_text(x: int=None, y: int=None, z: int=None) -> list[str] | None**  
   Retrieves the text from both the front and back sides of the sign block currently targeted by the player.  
   *Returns:* A list containing the text lines from the targeted sign (first four elements are the front, next four are the back).
+
+- **get_targeted_sign_text() -> list[str] | None**  
+  Alias for get_sign_text() to keep retro-compatibility
+
+- **set_sign_text(text: list[str], x: int=None, y: int=None, z: int=None, is_front: bool=None) -> bool**  
+  Retrieves the text from both the front and back sides of the sign block currently targeted by the player.  
+  *Returns:* A list containing the text lines from the targeted sign (first four elements are the front, next four are the back).
+
+- **set_targeted_sign_text() -> bool**  
+  Alias for set_sign_text() to keep retro-compatibility
 
 - **find_nearest_entity(name_str: str="", type_str: str="") -> EntityData | None**  
   Finds the nearest entity matching the specified name and/or type.  
@@ -544,6 +558,9 @@ Util.play_sound(Util.get_soundevents().BELL_BLOCK, Util.get_soundsource().BLOCKS
   Returns the `SoundSource` class from Minecraft, which can be used to get a sound_source for the `play_sound()` method.  
   See all available sound_sources [here](https://mappings.dev/1.21.8/net/minecraft/sounds/SoundSource.html).
 
+- **show_toast(title: str, desc: str) -> None**  
+  Display a Minecraft client toast notification with `title` and `desc` (description).  
+
 ---
 
 ## Events
@@ -628,6 +645,15 @@ kb.set_keybind(294, on_f5)
 # or with glfw_key_codes.py (remember to import it)
 kb.set_keybind(GLFWKey.F5, on_f5)
 ```
+
+---
+
+## Additional methods and utilities
+
+- **input(s: str = "", save_history: bool = False) -> str**  
+  Read a string from chat. (Replacement for Python's *input*)  
+  `s` is an optional prompt to display before showing the chat screen. Default is "".  
+  If `save_history` is True, the input string will be saved to chat history. Default is False.
 
 ---
 

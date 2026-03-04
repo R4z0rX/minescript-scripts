@@ -1,17 +1,18 @@
 """
     Minescript Plus
-    Version: 0.16.0-alpha
+    Version: 0.16.2-alpha
     Author: RazrCraft
-    Date: 2025-10-14
+    Date: 2026-03-04
 
     User-friendly API for scripts that adds extra functionality to the
-    Minescript mod, using lib_java and other libraries.
+    Minescript mod, using java built-in module and other libraries.
     This module should be imported by other scripts and not run directly.
 
     Usage: Similar to Minescript, import minescript_plus  # from Python script
 
     Minimum requirements: Minecaft 1.21.8, Minescript 5.0b6, Python 3.10
-    
+    (It currently works up to and including version MC 1.21.11.)
+
     Note: Some code shared by @maxuser (Minescript's creator) on the 
     official discord was used in this API, mostly in the Inventory class.
 
@@ -26,9 +27,9 @@ from time import sleep
 from math import floor
 from typing import Callable, Literal, Any
 from dataclasses import dataclass, asdict
-from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock,
-                        player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name,
-                        job_info, container_get_items, player_position, entities, echo_json)
+from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock, 
+                        player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name, player_hand_items, 
+                        job_info, container_get_items, player_position, entities, echo_json, show_chat_screen, append_chat_history)
 from minescript import VersionInfo as VF
 from minescript import version_info as ver_info
 from java import JavaClass, eval_pyjinn_script
@@ -40,8 +41,9 @@ except ModuleNotFoundError:
     lib_nbt_module = False
 
 set_default_executor(script_loop)
+echo_json.set_required_executor(render_loop)
 
-_ver: str = "0.16.0-alpha"
+_ver: str = "0.16.2-alpha"
 
 if svi < (3, 10):
     exit("Minescript Plus requires Python 3.10 or later.")
@@ -66,13 +68,44 @@ class VersionInfo(VF):
     python_version: str
     mappings_installed: bool
 
-def version_info():    
+def version_info():
     print(VersionInfo(**asdict(ver_info()), minescript_plus=_ver, python_version=version, mappings_installed=True), file=stderr)
+
+def input(s: str = "", save_history: bool = False) -> str:
+    """
+    Read a string from chat. (Replacement for Python's *input*)
+
+    Args:
+        s (str): Optional prompt to display before showing the chat screen. Default is "".
+        save_history (bool): If True, the input string will be saved to chat history. Default is False.
+
+    Returns:
+        str: The intercepted outgoing chat message.
+
+    """
+    with EventQueue() as event_queue:
+        event_queue.register_outgoing_chat_interceptor()
+        if s:
+            print(s)
+        show_chat_screen(True)
+        while True:
+            event = event_queue.get()
+            if event.type == EventType.OUTGOING_CHAT_INTERCEPT:
+                if save_history:
+                    append_chat_history(event.message)
+                return event.message
+
+def _check_ver(ver: str) -> bool: # type: ignore
+    mc_version = [int(v) for v in _mc_ver.split(".")]
+    ver_parts = [int(v) for v in ver.split(".")]
+    check = True
+    for i in range(3):
+        check = check and mc_version[i] >= ver_parts[i]
+    return check
 
 EventMode = Literal["flag", "callback"]
 EventName = Literal["on_title", "on_subtitle", "on_actionbar", "on_open_screen"]
 _events = {}
-
 
 class EventDefinition:
     def __init__(self, name: str, mode: EventMode, flag: bool = False, condition: Callable | None = None, interval: float | None = None):
@@ -344,7 +377,13 @@ def _check_fabric(clazz: str):
     if not fabric:
         print(f"Error: {clazz} class is only supported on Fabric")
         exit(1)
-    
+
+def _get_nbt(snbt: str) -> dict | None:
+    try:
+        return lib_nbt.parse_snbt(snbt)
+    except:  # noqa: E722
+        return None
+
 # # # INVENTORY # # #
 
 class Inventory:
@@ -512,8 +551,8 @@ class Inventory:
                 return None
 
         for it in fi:
-            nbt: dict = lib_nbt.parse_snbt(it.nbt)
-            if "components" in nbt:
+            nbt: dict | None = _get_nbt(it.nbt)
+            if nbt is not None and "components" in nbt:
                 comp = nbt.get("components")
                 if "minecraft:custom_name" in comp and comp.get("minecraft:custom_name") == cust_name:  # type: ignore
                     return it.slot
@@ -533,6 +572,22 @@ class Inventory:
             int: The total count of items with the specified item ID in the inventory.
         """
         return sum(stack.count for stack in inventory if stack.item == item_id)
+
+    @staticmethod
+    def get_lore(item: ItemStack=None) -> str | None:
+        if item is None:
+            item = player_hand_items().main_hand
+        if item is not None:
+            if type(item) is dict:
+                snbt: str = item.get("nbt")
+            else:
+                snbt: str = item.nbt
+            nbt: dict | None = _get_nbt(snbt)
+            if nbt is not None and "components" in nbt:
+                comp = nbt.get("components")
+                if "minecraft:lore" in comp:  # type: ignore
+                    return comp.get("minecraft:lore")
+        return None
 
 # # # SCREEN # # #
 
@@ -593,7 +648,7 @@ with render_loop:
             """
             title = _get_private_field(mc.gui, "title")
             if title is not None:
-                title = title.tryCollapseToString()
+                title = title.getString()
             return title  # type: ignore
 
         @staticmethod
@@ -696,6 +751,7 @@ with render_loop:
                 None
             """
             mc.gui.clearTitles()
+
     # End render_loop
 
 # # # KEY # # #
@@ -1102,15 +1158,16 @@ class World:
         return World.__get_level_data().getDayTime() # type: ignore
    
     @staticmethod
-    def get_targeted_sign_text() -> list[str] | None:
+    def get_sign_text(x: int=None, y: int=None, z: int=None) -> list[str] | None:
         """
         Retrieves the text from both the front and back sides of the sign block currently targeted by the player.
         
         Returns:
             list[str]: A list containing the text lines from the targeted sign. The first four elements are the lines from the front side, and the next four are from the back side.
         """
-        position = player_get_targeted_block().position
-        pos = BlockPos(*position)
+        if x is None or y is None or z is None:
+            x, y, z = player_get_targeted_block().position
+        pos = BlockPos(x, y, z)
 
         sign = mc.level.getBlockEntity(pos)
         if sign is None:
@@ -1126,7 +1183,101 @@ class World:
             sign_text.append(sign.getText(False).getMessage(i, True).tryCollapseToString())
         
         return sign_text
+    
+    @staticmethod
+    def get_targeted_sign_text() -> list[str] | None:
+        # Alias for get_sign_text() to keep retro-compatibility
+        return World.get_sign_text()
         
+    @staticmethod
+    def set_sign_text(text: list[str], x: int=None, y: int=None, z: int=None, is_front: bool=None) -> bool:
+        """
+        Set the text of a sign in the Minecraft client.
+        This function attempts to set the four lines of a sign at the given block
+        coordinates or, if coordinates are omitted, on the block the player is
+        currently targeting. It interacts with the Minecraft client to open/use the
+        sign, send a sign-update packet, and update the client-side block entity.
+        Args:
+          text (list[str]): A list of exactly four strings for the sign lines
+            (line 0 through line 3). Each line will be passed through the client's
+            text filtering before being applied.
+          x (int | None): X coordinate of the sign block. If None, the player's
+            targeted block is used.
+          y (int | None): Y coordinate of the sign block. If None, the player's
+            targeted block is used.
+          z (int | None): Z coordinate of the sign block. If None, the player's
+            targeted block is used.
+          is_front (bool | None): If True/False, selects whether the "front" text
+            face is edited. If None, the function will ask the block entity whether
+            the player is editing the front face and use that result.
+        Returns:
+          bool: True if the operation was initiated and the sign was updated client-
+            side; False if the function could not find a sign at the target location
+            (e.g., coordinates omitted and the player isn't targeting a sign, or the
+            targeted block is not a sign).
+        """
+        with render_loop:
+            pyj = eval_pyjinn_script(r"""
+List = JavaClass("java.util.List")
+MinecraftClient = JavaClass("net.minecraft.client.Minecraft")
+BlockPos = JavaClass("net.minecraft.core.BlockPos")
+ServerboundSignUpdatePacket = JavaClass("net.minecraft.network.protocol.game.ServerboundSignUpdatePacket")
+FilteredText = JavaClass("net.minecraft.server.network.FilteredText")
+InteractionHand = JavaClass("net.minecraft.world.InteractionHand")
+Direction = JavaClass("net.minecraft.core.Direction")
+Vec3 = JavaClass("net.minecraft.world.phys.Vec3")
+BlockHitResult = JavaClass("net.minecraft.world.phys.BlockHitResult")
+
+mc = MinecraftClient.getInstance()
+
+def _get_bloch_hit_result(bpos):
+    hit_vec = Vec3(bpos.getX() + 0.5, bpos.getY() + 1.0, bpos.getZ() + 0.5)
+    return BlockHitResult(hit_vec, Direction.UP, bpos, False)
+
+def _set_sign_text(text: list[str], x: int=None, y: int=None, z: int=None, is_front: bool=None) -> bool:
+    line1 = FilteredText.fullyFiltered(text[0])
+    line2 = FilteredText.fullyFiltered(text[1])
+    line3 = FilteredText.fullyFiltered(text[2])
+    line4 = FilteredText.fullyFiltered(text[3])
+    
+    if x is None or y is None or z is None:
+        target = player_get_targeted_block()
+
+        if target.type.contains("sign"):
+            x, y, z = target.position
+        else:
+            return False
+    
+    block_pos = BlockPos(x, y, z)
+    bhr = _get_bloch_hit_result(block_pos)
+    mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, bhr)
+
+    player_uuid = mc.player.getUUID()
+    block_entity = mc.level.getBlockEntity(block_pos)
+    block_entity.setAllowedPlayerEditor(player_uuid)
+    if is_front is None:
+        is_front = block_entity.isFacingFrontText(mc.player)
+    
+    block_entity.setAllowedPlayerEditor(player_uuid)
+    packet = ServerboundSignUpdatePacket(BlockPos(x, y, z), is_front, *text)
+    mc.player.connection.getConnection().send(packet)
+    
+    block_entity.updateSignText(mc.player, is_front, List.of(line1, line2, line3, line4))
+    
+    set_timeout(lambda: mc.setScreen(None), 100)
+    return True
+
+            """)
+        
+            _set_sign_text = pyj.get("_set_sign_text")
+        
+            return _set_sign_text(text, x, y, z, is_front) # type: ignore
+    
+    @staticmethod
+    def set_targeted_sign_text() -> bool:
+        # Alias for set_sign_text()
+        return World.set_sign_text()
+    
     @staticmethod
     def find_nearest_entity(name_str: str="", type_str: str="") -> EntityData | None:
         """
@@ -1432,25 +1583,65 @@ class Util:
         """
         return SoundSource
 
+    with render_loop:
+        @staticmethod
+        def show_toast(title: str, desc: str):
+            """
+            Display a Minecraft client toast notification.
+            
+            Args:
+                title (str):
+                    Title text for the toast.
+                desc (str):
+                    Description/body text for the toast; may include line breaks.
+            """
+            pyj_t = eval_pyjinn_script(r"""
+Minecraft = JavaClass("net.minecraft.client.Minecraft")
+Component = JavaClass("net.minecraft.network.chat.Component")
+ToastManager = JavaClass("net.minecraft.client.gui.components.toasts.ToastManager")
+SystemToast = JavaClass("net.minecraft.client.gui.components.toasts.SystemToast")
+
+mc = Minecraft.getInstance()
+
+def _show_toast(title: str, desc: str):
+    title = Component.literal(title)
+    desc = Component.literal(desc)
+    mc.getToastManager().addToast(SystemToast.multiline(mc, SystemToast.SystemToastId.PERIODIC_NOTIFICATION, title, desc))
+            """)
+            pyj_t.get("_show_toast")(title, desc)
+
+
 # # # HUD # # #
 if fabric:
     pyj_hud = eval_pyjinn_script(r"""
+def _check_ver(ver: str) -> bool:
+    _mc_ver = version_info().minecraft
+    mc_version = [int(v) for v in _mc_ver.split(".")]
+    ver_parts = [int(v) for v in ver.split(".")]
+    check = True
+    for i in range(3):
+        check = check and mc_version[i] >= ver_parts[i]
+    return check
+
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
 HudRenderCallback = JavaClass("net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback")
 ARGB = JavaClass("net.minecraft.util.ARGB")
 Component = JavaClass("net.minecraft.network.chat.Component")
 ChatFormatting = JavaClass("net.minecraft.ChatFormatting")
 BuiltInRegistries = JavaClass("net.minecraft.core.registries.BuiltInRegistries")
-ResourceLocation = JavaClass("net.minecraft.resources.ResourceLocation")
 ItemStack = JavaClass("net.minecraft.world.item.ItemStack")
 Items = JavaClass("net.minecraft.world.item.Items")
 Item = JavaClass("net.minecraft.world.item.Item")
+
+if _check_ver("1.21.11"):
+    ResourceLocation = JavaClass("net.minecraft.resources.Identifier")
+else:
+    ResourceLocation = JavaClass("net.minecraft.resources.ResourceLocation")
 
 mc = Minecraft.getInstance()
 
 toggle_key = 301  # F12
 tl = None
-frames = 0
 show = True
 _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool, float, float, list]] = {}
 _ti: int = 0
@@ -1460,10 +1651,10 @@ _ii: int = 0
 def _check_ver(ver: str) -> bool:
     _mc_ver = version_info().minecraft
     mc_version = [int(v) for v in _mc_ver.split(".")]
-    ver = [int(v) for v in ver.split(".")]
+    ver_parts = [int(v) for v in ver.split(".")]
     check = True
     for i in range(3):
-        check = check and mc_version[i] >= ver[i]
+        check = check and mc_version[i] >= ver_parts[i]
     return check
 
 def Float(number):
@@ -1477,9 +1668,9 @@ def render_item_count(gui_graphics, font, item_stack, scaled_X, scaled_Y, count)
 def combine(*values):
     return values
 
-def update_tuple(old_tuple, *new_values):
+def update_tuple(old_tuple, new_values):
     updated_list = list(old_tuple)
-    for i, value in enumerate(updated_list):
+    for i, value in enumerate(new_values):
         updated_list[i] = value
     return tuple(updated_list)
 
@@ -1633,8 +1824,6 @@ def _show_item(index: int, enable: bool):
     _items[index] = combine(enable, *old[1:])
     
 def on_hud_render(guiGraphics, tickDeltaManager):
-    global frames
-    
     if not show:
         return
     
@@ -1706,7 +1895,6 @@ def on_hud_render(guiGraphics, tickDeltaManager):
             else:
                 pose_stack.popPose()
 
-
 callback = ManagedCallback(on_hud_render)
 HudRenderCallback.EVENT.register(HudRenderCallback(callback))
 
@@ -1761,7 +1949,8 @@ class Hud:
             int: Index of the added text.
         """
         _check_fabric("Hud")
-        place_x = int(x - ((justifyX + 1) * mc.font.width(text) * scale * 0.5)) # type: ignore
+        width = mc.font.width(text)
+        place_x = int(x - ((justifyX + 1) * width * scale * 0.5)) # type: ignore
         place_y = int(y - ((justifyY + 1) * mc.font.lineHeight * scale * 0.5)) # type: ignore
         return _add_text(True, text, place_x, place_y, *color, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY, screens) # type: ignore
 
