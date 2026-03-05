@@ -13,6 +13,7 @@ This module should be imported by other scripts and not run directly.
 
 **For Minescript Plus v0.13-alpha or newer:**
 * Minecraft 1.21.5 - 1.21.11
+  * WorldRender is not yet available for use in 1.21.11.
 * Minescript 5.0b6 or newer
 * Python 3.10 or higher
 * java module (already included with Minescript)
