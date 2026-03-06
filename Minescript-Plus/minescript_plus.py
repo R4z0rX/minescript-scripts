@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.17.0-alpha
+    Version: 0.17.1-alpha
     Author: RazrCraft
-    Date: 2025-11-13
+    Date: 2026-03-06
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using java built-in module and other libraries.
@@ -11,7 +11,8 @@
     Usage: Similar to Minescript, import minescript_plus  # from Python script
 
     Minimum requirements: Minecaft 1.21.8, Minescript 5.0b6, Python 3.10
-    
+    (It currently works up to and including version MC 1.21.10.)
+
     Note: Some code shared by @maxuser (Minescript's creator) on the 
     official discord was used in this API, mostly in the Inventory class.
 
@@ -31,7 +32,7 @@ from typing import Callable, Literal, Any
 from dataclasses import dataclass, asdict
 from minescript import (set_default_executor, EventQueue, EventType, EntityData, script_loop, render_loop, ItemStack, TargetedBlock, 
                         player_inventory, player_get_targeted_block, press_key_bind, screen_name, player_name, player_hand_items, 
-                        job_info, container_get_items, player_position, entities, echo_json)
+                        job_info, container_get_items, player_position, entities, echo, echo_json, show_chat_screen, append_chat_history)
 from minescript import VersionInfo as VF
 from minescript import version_info as ver_info
 from java import JavaClass, eval_pyjinn_script
@@ -43,8 +44,10 @@ except ModuleNotFoundError:
     lib_nbt_module = False
 
 set_default_executor(script_loop)
+echo_json.set_required_executor(render_loop)
+echo.set_required_executor(render_loop)
 
-_ver: str = "0.17.0-alpha-dev"
+_ver: str = "0.17.1-alpha-dev"
 
 if svi < (3, 10):
     exit("Minescript Plus requires Python 3.10 or later.")
@@ -72,6 +75,33 @@ class VersionInfo(VF):
 
 def version_info():    
     print(VersionInfo(**asdict(ver_info()), minescript_plus=_ver, python_version=version, mappings_installed=True), file=stderr)
+
+def input(s: str = "", save_history: bool = False) -> str:
+    with EventQueue() as event_queue:
+        event_queue.register_outgoing_chat_interceptor()
+        if s:
+            print(s)
+        show_chat_screen(True)
+        while True:
+            event = event_queue.get()
+            if event.type == EventType.OUTGOING_CHAT_INTERCEPT:
+                if save_history:
+                    append_chat_history(event.message)
+                return event.message
+
+def _check_ver(ver: str) -> bool:
+    mc_version = [int(v) for v in _mc_ver.split(".")]
+    ver_parts = [int(v) for v in ver.split(".")]
+    check = True
+    for i in range(3):
+        check = check and mc_version[i] >= ver_parts[i]
+    return check
+    
+def _get_window_handle() -> int:
+    if _check_ver("1.21.9"):
+        return int(mc.getWindow().handle().toString()) # long # type: ignore
+    else:
+        return int(mc.getWindow().getWindow().toString()) # long # type: ignore
 
 EventMode = Literal["flag", "callback"]
 EventName = Literal["on_title", "on_subtitle", "on_actionbar", "on_open_screen"]
@@ -298,12 +328,6 @@ BlockPos = JavaClass("net.minecraft.core.BlockPos")
 SoundEvents = JavaClass("net.minecraft.sounds.SoundEvents")
 SoundSource = JavaClass("net.minecraft.sounds.SoundSource")
 LightLayer = JavaClass("net.minecraft.world.level.LightLayer")
-MC_Util = JavaClass("net.minecraft.Util")
-
-InteractionHand = JavaClass("net.minecraft.world.InteractionHand")
-BlockHitResult = JavaClass("net.minecraft.world.phys.BlockHitResult")
-Vec3 = JavaClass("net.minecraft.world.phys.Vec3")
-Direction = JavaClass("net.minecraft.core.Direction")
 
 mappings = Minescript.mappingsLoader.get()
 mc = Minecraft.getInstance()
@@ -954,79 +978,6 @@ class Player:
             float: The player's current XP bar progress (0.0 to 1.0).
         """
         return mc.player.experienceProgress # type: ignore
-    
-    @staticmethod
-    def set_player_vel(velocity: tuple):
-        """
-        ## WARNING: This will get you flagged by anticheat!
-
-        Sets the velocity of the player.
-
-        Args:
-            velocity: (x, y, z)
-        Time sensitive applications should be done in pyjinn instead of python.
-        """
-        x, y, z = velocity
-        mc.player.setDeltaMovement(x,y,z)
-    
-    @staticmethod
-    def add_player_vel(velocity: tuple):
-        """
-        ## WARNING: This will get you flagged by anticheat!
-
-        Adds velocity to the player.
-
-        Args:
-            velocity: (x, y, z)
-
-        Time sensitive applications should be done in pyjinn instead of python.
-        """
-        x, y, z = velocity
-        mc.player.addDeltaMovement(x,y,z)
-    
-    def send_place_packet(position: tuple):
-
-        """
-        ## WARNING: This will get you flagged by anticheat!
-
-        Places the block in your main hand at the selected coordinates.
-        
-        Args:
-            position: (x,y,z) Tuple for the location of the placement
-        
-        Time sensitive applications should be done in pyjinn instead of python.
-        """
-
-        
-        x = int(floor(position[0]))
-        y = int(floor(position[1]))
-        z = int(floor(position[2]))
-        try: 
-            mc.gameMode.useItemOn(
-                    mc.player, 
-                    InteractionHand.MAIN_HAND, 
-                    BlockHitResult(
-                        Vec3(*position), 
-                        Direction.UP, 
-                        BlockPos(x,y,z),
-                        False
-                        )
-                    )
-        except: pass
-    
-    def send_position_packet(position: tuple):
-        """
-        ## WARNING: This will get you flagged by anticheat!
-
-        Sets your position to the selected coordinates.
-
-        Args:
-            position: (x,y,z) Tuple for the location of the teleport
-
-        Time sensitive applications should be done in pyjinn instead of python.
-        """
-        x, y, z = position
-        Player.setPos(x, y, z)
 
 # # # SERVER # # #
 
@@ -1632,13 +1583,6 @@ class Util:
         All sounds from this class here: https://mappings.dev/1.21.8/net/minecraft/sounds/SoundSource.html
         """
         return SoundSource
-
-    @staticmethod
-    def get_platform():
-        """
-        Returns a string indicating the platform minecraft is running on.
-        """
-        return MC_Util.getPlatform()
     
     with render_loop:
         @staticmethod
@@ -1671,6 +1615,15 @@ def _show_toast(title: str, desc: str):
 # # # HUD # # #
 if fabric:
     pyj_hud = eval_pyjinn_script(r"""
+def _check_ver(ver: str) -> bool:
+    _mc_ver = version_info().minecraft
+    mc_version = [int(v) for v in _mc_ver.split(".")]
+    ver_parts = [int(v) for v in ver.split(".")]
+    check = True
+    for i in range(3):
+        check = check and mc_version[i] >= ver_parts[i]
+    return check
+
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
 HudRenderCallback = JavaClass("net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback")
 ARGB = JavaClass("net.minecraft.util.ARGB")
@@ -1680,6 +1633,11 @@ BuiltInRegistries = JavaClass("net.minecraft.core.registries.BuiltInRegistries")
 ItemStack = JavaClass("net.minecraft.world.item.ItemStack")
 Items = JavaClass("net.minecraft.world.item.Items")
 Item = JavaClass("net.minecraft.world.item.Item")
+
+if _check_ver("1.21.11"):
+    ResourceLocation = JavaClass("net.minecraft.resources.Identifier")
+else:
+    ResourceLocation = JavaClass("net.minecraft.resources.ResourceLocation")
 
 mc = Minecraft.getInstance()
 
@@ -1937,11 +1895,6 @@ def on_hud_render(guiGraphics, tickDeltaManager):
                 pose_stack.popMatrix()
             else:
                 pose_stack.popPose()
-
-if _check_ver("1.21.11"):
-    ResourceLocation = JavaClass("net.minecraft.resources.Identifier")
-else:
-    ResourceLocation = JavaClass("net.minecraft.resources.ResourceLocation")
 
 callback = ManagedCallback(on_hud_render)
 HudRenderCallback.EVENT.register(HudRenderCallback(callback))
@@ -2331,180 +2284,122 @@ class Hud:
 
 # # # WORLDRENDER # # #
 pyj_wr = eval_pyjinn_script(r"""
-Minecraft = JavaClass("net.minecraft.client.Minecraft")
-RenderType = JavaClass("net.minecraft.client.renderer.RenderType")
-RenderPipelines = JavaClass("net.minecraft.client.renderer.RenderPipelines")
-RenderStateShard = JavaClass("net.minecraft.client.renderer.RenderStateShard")
-PoseStack = JavaClass("com.mojang.blaze3d.vertex.PoseStack")
-DebugRenderer = JavaClass("net.minecraft.client.renderer.debug.DebugRenderer")
-ShapeRenderer = JavaClass("net.minecraft.client.renderer.ShapeRenderer")
-BlockPos = JavaClass("net.minecraft.core.BlockPos")
-AABB = JavaClass("net.minecraft.world.phys.AABB")
-ARGB = JavaClass("net.minecraft.util.ARGB")
-
-mc = Minecraft.getInstance()
-
-# create(String name, int size, boolean hasCrumbling, boolean translucent, RenderPipeline pipeline, RenderLayer$MultiPhaseParameters params)
-NO_CULL_LINES = RenderType.create("no_cull_lines", 1536, False, False, RenderPipelines.LINES, 
-    RenderType.CompositeState.builder()
-        .setLineState(RenderStateShard.DEFAULT_LINE)
-        .setLayeringState(RenderStateShard.NO_LAYERING)
-        .setOutputState(RenderStateShard.OUTLINE_TARGET)
-        .createCompositeState(False)
-)
-
-toggle_key = 301  # F12
-tl = None
-show = True
 
 def _check_ver(ver: str) -> bool:
     _mc_ver = version_info().minecraft
     mc_version = [int(v) for v in _mc_ver.split(".")]
-    ver = [int(v) for v in ver.split(".")]
+    ver_parts  = [int(v) for v in ver.split(".")]
     check = True
     for i in range(3):
-        check = check and mc_version[i] >= ver[i]
+        check = check and mc_version[i] >= ver_parts[i]
     return check
 
-def Float(number):
-    return number.floatValue()
+Minecraft          = JavaClass("net.minecraft.client.Minecraft")
+BlockPos           = JavaClass("net.minecraft.core.BlockPos")
+Gizmos             = JavaClass("net.minecraft.gizmos.Gizmos")
+GizmoStyle         = JavaClass("net.minecraft.gizmos.GizmoStyle")
+TextGizmo_Style    = JavaClass("net.minecraft.gizmos.TextGizmo$Style")
+Vec3               = JavaClass("net.minecraft.world.phys.Vec3")
+ARGB               = JavaClass("net.minecraft.util.ARGB")
+
+toggle_key = 301   # F12
+_toggle_listener = None
+show = True
 
 class WorldRender:
-    def __init__(self, max_size: int=1024):
+    def __init__(self, max_size: int = 1024):
         self.max_size = max_size
-        self.boxes = {}  # {(x, y, z): (r, g, b, a)}
-        self.texts = {}  # {(x, y, z): (text, r, g, b, a, size)}
+        self.boxes = {}   # {(x, y, z): (r, g, b, a)}
+        self.texts = {}   # {(x, y, z): (text, r, g, b, a, size)}
 
-    def add_box(self, x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255):
+    def add_box(self, x: int, y: int, z: int,
+                r: int = 255, g: int = 255, b: int = 255, a: int = 255) -> None:
         key = (x, y, z)
         if key in self.boxes:
             del self.boxes[key]
         self.boxes[key] = (r, g, b, a)
-
         if len(self.boxes) > self.max_size:
-            first_key = next(iter(self.boxes))
-            del self.boxes[first_key]
+            del self.boxes[next(iter(self.boxes))]
 
-    def remove_box(self, x: int, y: int, z: int):
+    def remove_box(self, x: int, y: int, z: int) -> None:
         del self.boxes[(x, y, z)]
-    
-    def get_box_list(self):
+
+    def get_box_list(self) -> dict:
         return self.boxes
 
-    def add_text(self, x: float, y: float, z: float, text: str, r: int=255, g: int=255, b: int=255, a: int=255, size: float=1.0):
+    def add_text(self, x: float, y: float, z: float, text: str,
+                 r: int = 255, g: int = 255, b: int = 255, a: int = 255,
+                 size: float = 1.0) -> None:
         key = (x, y, z)
         if key in self.texts:
             del self.texts[key]
         self.texts[key] = (text, r, g, b, a, size)
-
         if len(self.texts) > self.max_size:
-            first_key = next(iter(self.texts))
-            del self.texts[first_key]
+            del self.texts[next(iter(self.texts))]
 
-    def remove_text(self, x: float, y: float, z: float):
+    def remove_text(self, x: float, y: float, z: float) -> None:
         del self.texts[(x, y, z)]
-    
-    def get_text_list(self):
-        return self.texts
-    
-    def show_wr(self, enable: bool):
-        global show
 
+    def get_text_list(self) -> dict:
+        return self.texts
+
+    def show_wr(self, enable: bool) -> None:
+        global show
         show = enable
 
-    def use_toggle_key(self, enable: bool):
-        global tl
-        
-        if enable and tl is None:
-                tl = add_event_listener("key", on_press_key)
-        else:
-            if tl is not None:
-                remove_listener(tl)
-                tl = None
+    def use_toggle_key(self, enable: bool) -> None:
+        global _toggle_listener
+        if enable and _toggle_listener is None:
+            _toggle_listener = add_event_listener("key", _on_press_key)
+        elif not enable and _toggle_listener is not None:
+            remove_event_listener(_toggle_listener)
+            _toggle_listener = None
 
-    def set_toggle_key(self, tk: int):
+    def set_toggle_key(self, tk: int) -> None:
         global toggle_key
-        
         toggle_key = tk
-
 
 _wr = WorldRender()
 
-def render_text(context, text, text_pos, rgba, size, no_cull=False):
-    multi_buffer_source = context.consumers() # -> MultiBufferSource / VertexConsumerProvider
-    
-    if multi_buffer_source is None:
-        return True
-    
-    cam = context.camera()
-    cam_pos = cam.getPosition()
-    poseStack = PoseStack()
-    
-    poseStack.pushPose()
-    poseStack.translate(text_pos[0] - cam_pos.x, text_pos[1] - cam_pos.y, text_pos[2] - cam_pos.z)
-    poseStack.scale(Float(0.025), Float(0.025), Float(0.025))
-    
-    r, g, b, a = rgba
-    # color(int alpha, int red, int green, int blue)
-    color: int = ARGB.color(a, r, g, b)
-    # renderFloatingText(PoseStack matrices, MultiBufferSource vertexConsumers, String string, double x, double y, double z, int color, float size, boolean center, float offset, boolean visibleThroughObjects)
-    DebugRenderer.renderFloatingText(poseStack, multi_buffer_source, text, *text_pos, color, Float(size), True, 0.0, no_cull)
-    
-    poseStack.popPose()
-    
-def render_box(context, box_pos, rgba, no_cull=False):
-    multi_buffer_source = context.consumers() # -> MultiBufferSource / VertexConsumerProvider
-    
-    if multi_buffer_source is None:
-        return True
+def _render_boxes() -> None:
+    boxes = _wr.get_box_list()
+    if not boxes:
+        return
 
-    if no_cull:
-        vertex_consumer = multi_buffer_source.getBuffer(NO_CULL_LINES) # -> BufferBuilder
-    else:
-        vertex_consumer = multi_buffer_source.getBuffer(RenderType.lines()) # -> BufferBuilder
+    for pos, entry in boxes.items():
+        r, g, b, a = entry
+        color = ARGB.color(a, r, g, b)
+        block_pos = BlockPos(*pos)
+        Gizmos.cuboid(block_pos, GizmoStyle.stroke(color)).setAlwaysOnTop()
 
-    cam = context.camera()
-    cam_pos = cam.getPosition()
-    poseStack = PoseStack()
+def _render_texts() -> None:
+    texts = _wr.get_text_list()
+    if not texts:
+        return
 
-    poseStack.pushPose()
-    poseStack.translate(-cam_pos.x, -cam_pos.y, -cam_pos.z)
-    if _check_ver("1.21.9"):
-        pose = poseStack.last()
-    else:
-        pose = poseStack
+    for pos, entry in texts.items():
+        text, r, g, b, a, size = entry
+        tx, ty, tz = pos
+        color = ARGB.color(a, r, g, b)
+        style = TextGizmo_Style.forColorAndCentered(color).withScale(size)
+        world_pos = Vec3(JavaFloat(tx), JavaFloat(ty), JavaFloat(tz))
+        Gizmos.billboardText(text, world_pos, style).setAlwaysOnTop()
 
-    r, g, b, a = rgba
-    box = AABB(BlockPos(*box_pos))
-    # renderLineBox(PoseStack matrices, VertexConsumer vertexConsumers, AABB box, float red, float green, float blue, float alpha)
-    ShapeRenderer.renderLineBox(pose, vertex_consumer, box, Float(r/255), Float(g/255), Float(b/255), Float(a/255))
-    
-    poseStack.popPose()
-
-def on_press_key(event):
+def _on_press_key(event) -> None:
     global show
 
     if event.action == 0 and event.key == toggle_key:
         show = not show
 
-def on_world_render(event: RenderEvent) -> bool:
+def _on_render(event) -> None:
     if not show:
         return
-    
-    world_render_context = event.context
-    
-    render_box(world_render_context, (0, 0, 0), (0, 0, 0, 0), False)
-    
-    text_list = _wr.get_text_list()
-    for text_pos in text_list:
-        text, r, g, b, a, size = text_list[text_pos]
-        render_text(world_render_context, text, text_pos, (r, g, b, a), size, True)
-    
-    box_list = _wr.get_box_list()
-    for box_pos in box_list:
-        render_box(world_render_context, box_pos, box_list[box_pos], True)
 
-add_event_listener("render", on_world_render)
+    _render_texts()
+    _render_boxes()
+
+
+add_event_listener("render", _on_render)
 
 """)
 
@@ -2676,7 +2571,7 @@ class Data:
             pickle.dump(data, f)
 
     @staticmethod
-    def set_var(name: str, value: Any, var_type: int = VarType.PERMANENT, expire_time: int=0, session_id: int=-1):
+    def set_var(name: str, value: Any, var_type: int = VarType.PERMANENT, expire_time: int=0, session_id: int=-1, global_scope: bool=False):
         """
         Set a variable in the persistent Data store.
         
@@ -2690,12 +2585,16 @@ class Data:
             session_id (int, optional): For Data.VarType.SESSION variables, the identifier of the session this variable
                 belongs to.
                 Defaults to -1 (will use the current client window handle and it'll work until Minecraft is closed).
+            global_scope (bool, optional): Makes the variable accessible in global scope (for all the scripts).
         """
         if var_type == Data.VarType.SESSION and session_id == -1:
             #raise ValueError("Error: VarType.SESSION without session_id")
-            session_id = mc.getWindow().handle().toString() # long # type: ignore
+            session_id = _get_window_handle()
             
-        db_path = Data._get_db_path(path.basename(inspect.stack()[1].filename) == "minescript_plus.py" and not ns)
+        if global_scope:
+            db_path = Data._data_path + "global"
+        else:
+            db_path = Data._get_db_path(path.basename(inspect.stack()[1].filename) == "minescript_plus.py" and not ns)
         data = Data._load_db(db_path)
         
         metadata = {
@@ -2712,7 +2611,7 @@ class Data:
         Data._save_db(db_path, data)
 
     @staticmethod
-    def get_var(name: str, session_id: int=-1) -> Any:
+    def get_var(name: str, session_id: int=-1, global_scope: bool=False) -> Any:
         """
         Retrieve a stored variable from the persistent Data store.
         
@@ -2720,12 +2619,16 @@ class Data:
             name (str): The key/name of the variable to retrieve.
             session_id (int, optional): Session identifier used to validate SESSION-scoped variables. 
                 Defaults to -1 (will use the current client window handle and it'll work until Minecraft is closed).
+            global_scope (bool, optional): Makes the variable accessible in global scope (for all the scripts).
         Returns:
             Any or None
             The stored value associated with `name` (metadata['value']) if present and
             valid; otherwise None.
         """
-        db_path = Data._get_db_path(path.basename(inspect.stack()[1].filename) == "minescript_plus.py" and not ns)
+        if global_scope:
+            db_path = Data._data_path + "global"
+        else:
+            db_path = Data._get_db_path(path.basename(inspect.stack()[1].filename) == "minescript_plus.py" and not ns)
         data = Data._load_db(db_path)
         
         if name in data:
@@ -2742,7 +2645,7 @@ class Data:
             
             if var_type == Data.VarType.SESSION:
                 if session_id == -1:
-                    session_id = mc.getWindow().handle().toString() # long # type: ignore
+                    session_id = _get_window_handle()
                 if session_id != metadata.get('session_id'):
                     del data[name]
                     Data._save_db(db_path, data)

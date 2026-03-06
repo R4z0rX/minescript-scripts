@@ -1,8 +1,8 @@
 # Minescript Plus
 
-**Version:** 0.17.0-alpha  
+**Version:** 0.17.1-alpha  
 **Author:** RazrCraft  
-**Date:** 2025-11-11
+**Date:** 2026-03-06
 
 User-friendly API for scripts that adds extra functionality to the Minescript mod.  
 This module should be imported by other scripts and not run directly.
@@ -12,7 +12,7 @@ This module should be imported by other scripts and not run directly.
 ## Requirements
 
 **For Minescript Plus v0.13-alpha or newer:**
-* Minecraft (any version supported by Minescript)
+* Minecraft 1.21.5 - 1.21.11
 * Minescript 5.0b6 or newer
 * Python 3.10 or higher
 * java module (already included with Minescript)
@@ -37,7 +37,7 @@ First you need to download minescript_plus.py and place it in the /minescript fo
 Import the module in your script:
 
 ```python
-from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Trading, Hud, WorldRender, Util, Keybind, Event
+from minescript_plus import Inventory, Screen, Gui, Key, Client, Player, Server, World, Trading, Hud, Util, Keybind, Event, input
 ```
 
 You don't need to import all the classes, just the ones you need. \
@@ -102,6 +102,10 @@ if slot is not None:
 - **count_total(inventory: list[ItemStack], item_id: int) -> int**  
   Counts the total number of items with a specific item ID in the given inventory.  
   *Returns:* The total count of items with the specified item ID.
+
+- **get_lore(item: ItemStack=None) -> str | None**  
+   Gets the lore text of the specified item.  
+  *Returns:* The lore of the item, or None if it doesn't have any.
 
 ---
 
@@ -287,12 +291,16 @@ Methods for retrieving world information.
 - **get_sign_text(x: int=None, y: int=None, z: int=None) -> list[str] | None**  
   Retrieves the text from both the front and back sides of the sign block currently targeted by the player.  
   *Returns:* A list containing the text lines from the targeted sign (first four elements are the front, next four are the back).
-  Alias: set_targeted_sign_text()
+
+- **get_targeted_sign_text() -> list[str] | None**  
+  Alias for get_sign_text() to keep retro-compatibility
 
 - **set_sign_text(text: list[str], x: int=None, y: int=None, z: int=None, is_front: bool=None) -> bool**  
   Retrieves the text from both the front and back sides of the sign block currently targeted by the player.  
   *Returns:* A list containing the text lines from the targeted sign (first four elements are the front, next four are the back).
-  Alias: set_targeted_sign_text()
+
+- **set_targeted_sign_text() -> bool**  
+  Alias for set_sign_text() to keep retro-compatibility
 
 - **find_nearest_entity(name_str: str="", type_str: str="") -> EntityData | None**  
   Finds the nearest entity matching the specified name and/or type.  
@@ -475,57 +483,6 @@ Hud.set_item_count(item_id, str(current_count + 5))
 
 ---
 
-### WorldRender
-
-Methods for rendering wireframe blocks and floating texts in the world (3D debug rendering).
-
-- **add_box(x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255) -> None**  
-  Adds/Updates a wireframe block at the given integer world coordinates. Color channels and alpha are 0–255.
-
-- **remove_block(x: int, y: int, z: int) -> None**  
-  Removes a previously added wireframe block at the specified coordinates.
-
-- **get_block_list() -> dict**  
-  Returns the internal mapping of currently tracked wireframe blocks as {(x, y, z): (r, g, b, a)}.
-
-- **add_text(x: float, y: float, z: float, text: str, r: int=255, g: int=255, b: int=255, a: int=255, size: float=1.0) -> None**  
-  Adds/Updates a floating text label at the given world coordinates. `size` scales the rendered text.
-
-- **remove_text(x: float, y: float, z: float) -> None**  
-  Removes a floating text previously added at the specified coordinates.
-
-- **get_text_list() -> dict**  
-  Returns the internal mapping of floating texts as {(x, y, z): (text, r, g, b, a, size)}.
-
-- **show_wr(enable: bool) -> None**  
-  Enables or disables display of all WorldRender content.
-
-- **use_toggle_key(enable: bool) -> None**  
-  Enables/disables the key listener which toggles WorldRender display (default key is F12).
-
-- **set_toggle_key(toggle_key: int) -> None**  
-  Sets the GLFW key code used to toggle WorldRender display.
-
-**Example:**
-```python
-# Example usage
-from minescript_plus import WorldRender
-
-# add a semi-transparent red wireframe at (10, 64, 10)
-WorldRender.add_box(10, 64, 10, r=255, g=0, b=0, a=128)
-
-# add a floating yellow label above the block (previous wirefame)
-WorldRender.add_text(10.5, 65.5, 10.5, "Sample", r=255, g=255, b=0, a=255, size=1.0)
-
-# enable toggle key to show/hide the world render overlay
-WorldRender.use_toggle_key(True)
-
-# hide the world render overlay from code instead of a toggle key
-WorldRender.show_wr(False)
-```
-
----
-
 ### [`Util`](Minescript-Plus/minescript_plus.py )
 Utility methods.
 
@@ -609,7 +566,7 @@ Util.play_sound(Util.get_soundevents().BELL_BLOCK, Util.get_soundsource().BLOCKS
   ```python
   from minescript_plus import Util
   Util.show_toast("My cool script", "Information saved correctly.")
-  ```
+  ``` 
 
 ---
 
@@ -728,6 +685,15 @@ Data.set_var("session_state", {"x": 1}, var_type=Data.VarType.SESSION)
 val = Data.get_var("my_key")
 temp = Data.get_var("temp")
 ```
+
+---
+
+## Additional methods and utilities
+
+- **input(s: str = "", save_history: bool = False) -> str**  
+  Read a string from chat. (Replacement for Python's *input*)  
+  `s` is an optional prompt to display before showing the chat screen. Default is "".  
+  If `save_history` is True, the input string will be saved to chat history. Default is False.
 
 ---
 
