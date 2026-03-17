@@ -4,6 +4,7 @@
     @modify date 2026-03-09 01:55:56
     @desc World rendering for Minecraft 1.21.11+
  """
+from typing import overload
 from minescript import set_default_executor, script_loop
 from java import eval_pyjinn_script
 
@@ -448,37 +449,98 @@ add_event_listener("render", _on_render)
 
 _wr = pyj_wr.get("_wr")
 
+type BlockPos = tuple[int, int, int]
+type Vec3 = tuple[float, float, float]
+
 class WorldRender:
 
     # ── Boxes ─────────────────────────────────────────────────────────────────
 
+    @overload
     @staticmethod
-    def add_box(x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, 
-                r: int=255, g: int=255, b: int=255, a: int=255, always_on_top: bool=True) -> int:
+    def add_box(
+        x1: int, y1: int, z1: int, x2: int, y2: int, z2: int,
+        r: int = 255, g: int = 255, b: int = 255, a: int = 255, /, *,
+        always_on_top: bool = True
+    ) -> int:
+        ...
+
+    @overload
+    @staticmethod
+    def add_box(
+        pos1: BlockPos, pos2: BlockPos,
+        rgba: tuple[int, int, int, int], /, *,
+        always_on_top: bool = True
+    ) -> int:
+        ...
+        
+    @staticmethod
+    def add_box(
+        x1: int | BlockPos,
+        y1: int | BlockPos,
+        z1: int | tuple[int, int, int, int] | None = None,
+        x2: int | None = None,
+        y2: int | None = None,
+        z2: int | None = None,
+        r: int = 255,
+        g: int = 255,
+        b: int = 255,
+        a: int = 255, /, *,
+        always_on_top: bool = True
+    ) -> int:
         """
         Add a box at the specified integer world coordinates.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: add_box(x1, y1, z1, x2, y2, z2, r=255, g=255, b=255, a=255, always_on_top=True)
+
+        2. Position tuples: add_box(pos1, pos2, rgba, always_on_top=True)
+
         Args:
-            x1 (int): X coordinate of position1 (integer grid position).
-            y1 (int): Y coordinate of position1 (integer grid position).
-            z1 (int): Z coordinate of position1 (integer grid position).
-            x2 (int): X coordinate of position2 (integer grid position).
-            y2 (int): Y coordinate of position2 (integer grid position).
-            z2 (int): Z coordinate of position2 (integer grid position).
-            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
-            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
-            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
-            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
-            always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+            For the first overload:
+                x1 (int): X coordinate of position1 (integer grid position).
+                y1 (int): Y coordinate of position1 (integer grid position).
+                z1 (int): Z coordinate of position1 (integer grid position).
+                x2 (int): X coordinate of position2 (integer grid position).
+                y2 (int): Y coordinate of position2 (integer grid position).
+                z2 (int): Z coordinate of position2 (integer grid position).
+                r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+                g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+                b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+                a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+
+            For the second overload:
+                pos1 (BlockPos): Tuple of (x1, y1, z1) for position1.
+                pos2 (BlockPos): Tuple of (x2, y2, z2) for position2.
+                rgba (tuple[int, int, int, int]): Tuple of (r, g, b, a) color values.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
 
         Returns:
             int: Unique ID assigned to this box.
         """
-        return _wr.add_box(x1, y1, z1, x2, y2, z2, r, g, b, a, always_on_top) # type: ignore
+        if isinstance(x1, tuple) and isinstance(y1, tuple) and isinstance(z1, tuple):
+            return _wr.add_box(*x1, *y1, *z1, always_on_top) # type: ignore
+        else:
+            return _wr.add_box(x1, y1, z1, x2, y2, z2, r, g, b, a, always_on_top) # type: ignore
 
+    @overload
     @staticmethod
     def remove_box(x1: int=None, y1: int=None, z1: int=None,
-                   x2: int=None, y2: int=None, z2: int=None, *, id: int=None):
+                   x2: int=None, y2: int=None, z2: int=None, *,
+                   id: int=None) -> None:
+        ...
+
+    @overload
+    @staticmethod
+    def remove_box(pos1: BlockPos, pos2: BlockPos, /, *, id: int=None) -> None:
+        ...
+
+    @staticmethod
+    def remove_box(x1: int | BlockPos | None=None, y1: int | BlockPos | None=None, z1: int | None = None,
+                   x2: int | None = None, y2: int | None = None, z2: int | None = None, *,
+                   id: int | None = None) -> None:
         """
         Remove a box by coordinates or by ID.
 
@@ -508,42 +570,95 @@ class WorldRender:
 
 # ── Blocks ─────────────────────────────────────────────────────────────────
 
+    @overload
     @staticmethod
-    def add_block(x: int, y: int, z: int, r: int=255, g: int=255, b: int=255, a: int=255,
-                always_on_top: bool=True) -> int:
+    def add_block(x: int, y: int, z: int, r: int = 255, g: int = 255, b: int = 255, a: int = 255,
+                  always_on_top: bool = True) -> int:
+        ...
+
+    @overload
+    @staticmethod
+    def add_block(pos: BlockPos, rgba: tuple[int, int, int, int], always_on_top: bool = True, /) -> int:
+        ...
+
+    @staticmethod
+    def add_block(x: int | BlockPos, y: int | tuple[int, int, int, int] | None = None, z: int | None = None,
+                  r: int = 255, g: int = 255, b: int = 255, a: int = 255, always_on_top: bool = True) -> int:
         """
         Add a block at the specified integer world coordinates.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: add_block(x, y, z, r=255, g=255, b=255, a=255, always_on_top=True)
+
+        2. Position tuple: add_block(pos, rgba, always_on_top=True)
+
         Args:
-            x (int): X coordinate of the block (integer grid position).
-            y (int): Y coordinate of the block (integer grid position).
-            z (int): Z coordinate of the block (integer grid position).
-            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
-            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
-            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
-            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
-            always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+            For the first overload:
+                x (int): X coordinate of the block (integer grid position).
+                y (int): Y coordinate of the block (integer grid position).
+                z (int): Z coordinate of the block (integer grid position).
+                r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+                g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+                b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+                a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+
+            For the second overload:
+                pos (BlockPos): Tuple of (x, y, z) for the block position.
+                rgba (tuple[int, int, int, int]): Tuple of (r, g, b, a) color values.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
 
         Returns:
             int: Unique ID assigned to this block.
         """
-        return _wr.add_block(x, y, z, r, g, b, a, always_on_top) # type: ignore
+        if isinstance(x, tuple) and isinstance(y, tuple):
+            return _wr.add_block(*x, *y, always_on_top)  # type: ignore
+        else:
+            return _wr.add_block(x, y, z, r, g, b, a, always_on_top)  # type: ignore
+
+    @overload
+    @staticmethod
+    def remove_block(x: int = None, y: int = None, z: int = None, *, id: int = None) -> None:
+        ...
+
+    @overload
+    @staticmethod
+    def remove_block(pos: BlockPos, /, *, id: int = None) -> None:
+        ...
 
     @staticmethod
-    def remove_block(x: int=None, y: int=None, z: int=None, *, id: int=None):
+    def remove_block(x: int | BlockPos | None = None,
+                     y: int | None = None,
+                     z: int | None = None, *,
+                     id: int | None = None) -> None:
         """
         Remove a block by coordinates or by ID.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: remove_block(x, y, z, id=None)
+
+        2. Position tuple: remove_block(pos, id=None)
+
         Args:
-            x (int, optional): X coordinate of the block.
-            y (int, optional): Y coordinate of the block.
-            z (int, optional): Z coordinate of the block.
-            id (int, optional): Unique ID returned by add_block. If provided, coordinates are ignored.
+            For the first overload:
+                x (int, optional): X coordinate of the block.
+                y (int, optional): Y coordinate of the block.
+                z (int, optional): Z coordinate of the block.
+                id (int, optional): Unique ID returned by add_block. If provided, coordinates are ignored.
+
+            For the second overload:
+                pos (BlockPos): Tuple of (x, y, z) for the block position.
+                id (int, optional): Unique ID returned by add_block. If provided, position is ignored.
 
         Returns:
             None
         """
-        _wr.remove_block(x, y, z, id)
+        if isinstance(x, tuple):
+            _wr.remove_block(*x, id)
+        else:
+            _wr.remove_block(x, y, z, id)
 
     @staticmethod
     def get_block_list() -> dict:
@@ -557,44 +672,110 @@ class WorldRender:
 
     # ── Texts ─────────────────────────────────────────────────────────────────
 
+    @overload
     @staticmethod
-    def add_text(x: float, y: float, z: float, text: str, r: int=255, g: int=255, b: int=255,
-                 a: int=255, size: float=1.0, always_on_top: bool=True) -> int:
+    def add_text(x: float, y: float, z: float,
+                 text: str,
+                 r: int = 255, g: int = 255, b: int = 255, a: int = 255,
+                 size: float = 1.0, /, *,
+                 always_on_top: bool = True) -> int:
+        ...
+
+    @overload
+    @staticmethod
+    def add_text(pos: Vec3,
+                 text: str,
+                 rgba: tuple[int, int, int, int],
+                 size: float = 1.0, /, *,
+                 always_on_top: bool = True) -> int:
+        ...
+
+    @staticmethod
+    def add_text(x: float | Vec3,
+                 y: float | str | None = None,
+                 z: float | tuple[int, int, int, int] | None = None,
+                 text: str | float = "",
+                 r: int = 255, g: int = 255, b: int = 255, a: int = 255,
+                 size: float = 1.0, /, *, always_on_top: bool = True) -> int:
         """
         Add a floating text label at the specified world coordinates.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: add_text(x, y, z, text, r=255, g=255, b=255, a=255, size=1.0, always_on_top=True)
+
+        2. Position tuple: add_text(pos, text, rgba, size=1.0, always_on_top=True)
+
         Args:
-            x (float): X coordinate in world space.
-            y (float): Y coordinate in world space.
-            z (float): Z coordinate in world space.
-            text (str): The text to render.
-            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
-            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
-            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
-            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
-            size (float, optional): Scale/size multiplier for the rendered text. Defaults to 1.0.
-            always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+            For the first overload:
+                x (float): X coordinate in world space.
+                y (float): Y coordinate in world space.
+                z (float): Z coordinate in world space.
+                text (str): The text to render.
+                r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+                g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+                b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+                a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+                size (float, optional): Scale/size multiplier for the rendered text. Defaults to 1.0.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+
+            For the second overload:
+                pos (Vec3): Tuple of (x, y, z) for the text position.
+                text (str): The text to render.
+                rgba (tuple[int, int, int, int]): Tuple of (r, g, b, a) color values.
+                size (float, optional): Scale/size multiplier for the rendered text. Defaults to 1.0.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
 
         Returns:
             int: Unique ID assigned to this text.
         """
-        return _wr.add_text(x, y, z, text, r, g, b, a, size, always_on_top) # type: ignore
+        if isinstance(x, tuple) and isinstance(y, str) and isinstance(z, tuple):
+            return _wr.add_text(*x, y, *z, size, always_on_top)  # type: ignore
+        else:
+            return _wr.add_text(x, y, z, text, r, g, b, a, size, always_on_top)  # type: ignore
+
+    @overload
+    @staticmethod
+    def remove_text(x: float = None, y: float = None, z: float = None, *, id: int = None) -> None:
+        ...
+
+    @overload
+    @staticmethod
+    def remove_text(pos: Vec3, /, *, id: int = None) -> None:
+        ...
 
     @staticmethod
-    def remove_text(x: float=None, y: float=None, z: float=None, *, id: int=None):
+    def remove_text(x: float | Vec3 | None = None,
+                    y: float | None = None,
+                    z: float | None = None, *,
+                    id: int | None = None) -> None:
         """
         Remove a floating text label by coordinates or by ID.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: remove_text(x, y, z, id=None)
+
+        2. Position tuple: remove_text(pos, id=None)
+
         Args:
-            x (float, optional): X coordinate in world space.
-            y (float, optional): Y coordinate in world space.
-            z (float, optional): Z coordinate in world space.
-            id (int, optional): Unique ID returned by add_text. If provided, coordinates are ignored.
+            For the first overload:
+                x (float, optional): X coordinate in world space.
+                y (float, optional): Y coordinate in world space.
+                z (float, optional): Z coordinate in world space.
+                id (int, optional): Unique ID returned by add_text. If provided, coordinates are ignored.
+
+            For the second overload:
+                pos (Vec3): Tuple of (x, y, z) for the text position.
+                id (int, optional): Unique ID returned by add_text. If provided, position is ignored.
 
         Returns:
             None
         """
-        _wr.remove_text(x, y, z, id)
+        if isinstance(x, tuple):
+            _wr.remove_text(*x, id)
+        else:
+            _wr.remove_text(x, y, z, id)
 
     @staticmethod
     def get_text_list() -> dict:
@@ -608,43 +789,99 @@ class WorldRender:
 
     # ── Points ────────────────────────────────────────────────────────────────
 
+    @overload
     @staticmethod
-    def add_point(x: float, y: float, z: float, r: int=255, g: int=255, b: int=255,
-                  a: int=255, size: float=4.0, always_on_top: bool=True) -> int:
+    def add_point(x: float, y: float, z: float, r: int = 255, g: int = 255, b: int = 255,
+                  a: int = 255, size: float = 4.0, always_on_top: bool = True) -> int:
+        ...
+
+    @overload
+    @staticmethod
+    def add_point(pos: Vec3, rgba: tuple[int, int, int, int], size: float = 4.0,
+                  always_on_top: bool = True, /) -> int:
+        ...
+
+    @staticmethod
+    def add_point(x: float | Vec3, y: float | tuple[int, int, int, int] | None = None, z: float | None = None,
+                  r: int = 255, g: int = 255, b: int = 255, a: int = 255, size: float = 4.0,
+                  always_on_top: bool = True) -> int:
         """
         Add a point at the specified world coordinates.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: add_point(x, y, z, r=255, g=255, b=255, a=255, size=4.0, always_on_top=True)
+
+        2. Position tuple: add_point(pos, rgba, size=4.0, always_on_top=True)
+
         Args:
-            x (float): X coordinate in world space.
-            y (float): Y coordinate in world space.
-            z (float): Z coordinate in world space.
-            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
-            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
-            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
-            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
-            size (float, optional): Rendered size of the point. Defaults to 4.0.
-            always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+            For the first overload:
+                x (float): X coordinate in world space.
+                y (float): Y coordinate in world space.
+                z (float): Z coordinate in world space.
+                r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+                g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+                b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+                a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+                size (float, optional): Rendered size of the point. Defaults to 4.0.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+
+            For the second overload:
+                pos (Vec3): Tuple of (x, y, z) for the point position.
+                rgba (tuple[int, int, int, int]): Tuple of (r, g, b, a) color values.
+                size (float, optional): Rendered size of the point. Defaults to 4.0.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
 
         Returns:
             int: Unique ID assigned to this point.
         """
-        return _wr.add_point(x, y, z, r, g, b, a, size, always_on_top) # type: ignore
+        if isinstance(x, tuple) and isinstance(y, tuple):
+            return _wr.add_point(*x, *y, size, always_on_top)  # type: ignore
+        else:
+            return _wr.add_point(x, y, z, r, g, b, a, size, always_on_top)  # type: ignore
+
+    @overload
+    @staticmethod
+    def remove_point(x: float = None, y: float = None, z: float = None, *, id: int = None) -> None:
+        ...
+
+    @overload
+    @staticmethod
+    def remove_point(pos: Vec3, /, *, id: int = None) -> None:
+        ...
 
     @staticmethod
-    def remove_point(x: float=None, y: float=None, z: float=None, *, id: int=None):
+    def remove_point(x: float | Vec3 | None = None,
+                    y: float | None = None,
+                    z: float | None = None, *,
+                    id: int | None = None) -> None:
         """
         Remove a point by coordinates or by ID.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: remove_point(x, y, z, id=None)
+
+        2. Position tuple: remove_point(pos, id=None)
+
         Args:
-            x (float, optional): X coordinate in world space.
-            y (float, optional): Y coordinate in world space.
-            z (float, optional): Z coordinate in world space.
-            id (int, optional): Unique ID returned by add_point. If provided, coordinates are ignored.
+            For the first overload:
+                x (float, optional): X coordinate in world space.
+                y (float, optional): Y coordinate in world space.
+                z (float, optional): Z coordinate in world space.
+                id (int, optional): Unique ID returned by add_point. If provided, coordinates are ignored.
+
+            For the second overload:
+                pos (Vec3): Tuple of (x, y, z) for the point position.
+                id (int, optional): Unique ID returned by add_point. If provided, position is ignored.
 
         Returns:
             None
         """
-        _wr.remove_point(x, y, z, id)
+        if isinstance(x, tuple):
+            _wr.remove_point(*x, id)
+        else:
+            _wr.remove_point(x, y, z, id)
 
     @staticmethod
     def get_point_list() -> dict:
@@ -658,51 +895,108 @@ class WorldRender:
 
     # ── Lines ─────────────────────────────────────────────────────────────────
 
+    @overload
     @staticmethod
     def add_line(x1: float, y1: float, z1: float, x2: float, y2: float, z2: float,
-                 r: int=255, g: int=255, b: int=255, a: int=255, width: float=1.0,
-                 always_on_top: bool=True) -> int:
+                 r: int = 255, g: int = 255, b: int = 255, a: int = 255, width: float = 1.0,
+                 always_on_top: bool = True) -> int:
+        ...
+
+    @overload
+    @staticmethod
+    def add_line(pos1: Vec3, pos2: Vec3, rgba: tuple[int, int, int, int], width: float = 1.0,
+                 always_on_top: bool = True, /) -> int:
+        ...
+
+    @staticmethod
+    def add_line(x1: float | Vec3, y1: float | Vec3 | None = None, z1: float | tuple[int, int, int, int] | None = None,
+                 x2: float | None = None, y2: float | None = None, z2: float | None = None,
+                 r: int = 255, g: int = 255, b: int = 255, a: int = 255, width: float = 1.0,
+                 always_on_top: bool = True) -> int:
         """
         Add a line segment between two world-space points.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: add_line(x1, y1, z1, x2, y2, z2, r=255, g=255, b=255, a=255, width=1.0, always_on_top=True)
+
+        2. Position tuples: add_line(pos1, pos2, rgba, width=1.0, always_on_top=True)
+
         Args:
-            x1 (float): X coordinate of the start point.
-            y1 (float): Y coordinate of the start point.
-            z1 (float): Z coordinate of the start point.
-            x2 (float): X coordinate of the end point.
-            y2 (float): Y coordinate of the end point.
-            z2 (float): Z coordinate of the end point.
-            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
-            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
-            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
-            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
-            width (float, optional): Line width. Defaults to 1.0.
-            always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+            For the first overload:
+                x1 (float): X coordinate of the start point.
+                y1 (float): Y coordinate of the start point.
+                z1 (float): Z coordinate of the start point.
+                x2 (float): X coordinate of the end point.
+                y2 (float): Y coordinate of the end point.
+                z2 (float): Z coordinate of the end point.
+                r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+                g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+                b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+                a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+                width (float, optional): Line width. Defaults to 1.0.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+
+            For the second overload:
+                pos1 (Vec3): Tuple of (x1, y1, z1) for the start point.
+                pos2 (Vec3): Tuple of (x2, y2, z2) for the end point.
+                rgba (tuple[int, int, int, int]): Tuple of (r, g, b, a) color values.
+                width (float, optional): Line width. Defaults to 1.0.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
 
         Returns:
             int: Unique ID assigned to this line.
         """
-        return _wr.add_line(x1, y1, z1, x2, y2, z2, r, g, b, a, width, always_on_top) # type: ignore
+        if isinstance(x1, tuple) and isinstance(y1, tuple) and isinstance(z1, tuple):
+            return _wr.add_line(*x1, *y1, *z1, width, always_on_top)  # type: ignore
+        else:
+            return _wr.add_line(x1, y1, z1, x2, y2, z2, r, g, b, a, width, always_on_top)  # type: ignore
+
+    @overload
+    @staticmethod
+    def remove_line(x1: float = None, y1: float = None, z1: float = None, x2: float = None,
+                    y2: float = None, z2: float = None, *, id: int = None) -> None:
+        ...
+
+    @overload
+    @staticmethod
+    def remove_line(pos1: Vec3, pos2: Vec3, /, *, id: int = None) -> None:
+        ...
 
     @staticmethod
-    def remove_line(x1: float=None, y1: float=None, z1: float=None, x2: float=None,
-                    y2: float=None, z2: float=None, *, id: int=None):
+    def remove_line(x1: float | Vec3 | None = None, y1: float | Vec3 | None = None, z1: float | None = None,
+                    x2: float | None = None, y2: float | None = None, z2: float | None = None, *, id: int | None = None) -> None:
         """
         Remove a line segment by endpoint coordinates or by ID.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: remove_line(x1, y1, z1, x2, y2, z2, id=None)
+
+        2. Position tuples: remove_line(pos1, pos2, id=None)
+
         Args:
-            x1 (float, optional): X coordinate of the start point.
-            y1 (float, optional): Y coordinate of the start point.
-            z1 (float, optional): Z coordinate of the start point.
-            x2 (float, optional): X coordinate of the end point.
-            y2 (float, optional): Y coordinate of the end point.
-            z2 (float, optional): Z coordinate of the end point.
-            id (int, optional): Unique ID returned by add_line. If provided, coordinates are ignored.
+            For the first overload:
+                x1 (float, optional): X coordinate of the start point.
+                y1 (float, optional): Y coordinate of the start point.
+                z1 (float, optional): Z coordinate of the start point.
+                x2 (float, optional): X coordinate of the end point.
+                y2 (float, optional): Y coordinate of the end point.
+                z2 (float, optional): Z coordinate of the end point.
+                id (int, optional): Unique ID returned by add_line. If provided, coordinates are ignored.
+
+            For the second overload:
+                pos1 (Vec3): Tuple of (x1, y1, z1) for the start point.
+                pos2 (Vec3): Tuple of (x2, y2, z2) for the end point.
+                id (int, optional): Unique ID returned by add_line. If provided, positions are ignored.
 
         Returns:
             None
         """
-        _wr.remove_line(x1, y1, z1, x2, y2, z2, id)
+        if isinstance(x1, tuple) and isinstance(y1, tuple):
+            _wr.remove_line(*x1, *y1, id)
+        else:
+            _wr.remove_line(x1, y1, z1, x2, y2, z2, id)
 
     @staticmethod
     def get_line_list() -> dict:
@@ -716,51 +1010,108 @@ class WorldRender:
 
     # ── Arrows ────────────────────────────────────────────────────────────────
 
+    @overload
     @staticmethod
     def add_arrow(x1: float, y1: float, z1: float, x2: float, y2: float, z2: float,
-                  r: int=255, g: int=255, b: int=255, a: int=255, width: float=1.0,
-                  always_on_top: bool=True) -> int:
+                  r: int = 255, g: int = 255, b: int = 255, a: int = 255, width: float = 1.0,
+                  always_on_top: bool = True) -> int:
+        ...
+
+    @overload
+    @staticmethod
+    def add_arrow(pos1: Vec3, pos2: Vec3, rgba: tuple[int, int, int, int], width: float = 1.0,
+                  always_on_top: bool = True, /) -> int:
+        ...
+
+    @staticmethod
+    def add_arrow(x1: float | Vec3, y1: float | Vec3 | None = None, z1: float | tuple[int, int, int, int] | None = None,
+                  x2: float | None = None, y2: float | None = None, z2: float | None = None,
+                  r: int = 255, g: int = 255, b: int = 255, a: int = 255, width: float = 1.0,
+                  always_on_top: bool = True) -> int:
         """
         Add an arrow from a start point to an end point in world space.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: add_arrow(x1, y1, z1, x2, y2, z2, r=255, g=255, b=255, a=255, width=1.0, always_on_top=True)
+
+        2. Position tuples: add_arrow(pos1, pos2, rgba, width=1.0, always_on_top=True)
+
         Args:
-            x1 (float): X coordinate of the arrow tail.
-            y1 (float): Y coordinate of the arrow tail.
-            z1 (float): Z coordinate of the arrow tail.
-            x2 (float): X coordinate of the arrow head.
-            y2 (float): Y coordinate of the arrow head.
-            z2 (float): Z coordinate of the arrow head.
-            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
-            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
-            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
-            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
-            width (float, optional): Shaft width. Defaults to 1.0.
-            always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+            For the first overload:
+                x1 (float): X coordinate of the arrow tail.
+                y1 (float): Y coordinate of the arrow tail.
+                z1 (float): Z coordinate of the arrow tail.
+                x2 (float): X coordinate of the arrow head.
+                y2 (float): Y coordinate of the arrow head.
+                z2 (float): Z coordinate of the arrow head.
+                r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+                g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+                b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+                a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+                width (float, optional): Shaft width. Defaults to 1.0.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+
+            For the second overload:
+                pos1 (Vec3): Tuple of (x1, y1, z1) for the arrow tail.
+                pos2 (Vec3): Tuple of (x2, y2, z2) for the arrow head.
+                rgba (tuple[int, int, int, int]): Tuple of (r, g, b, a) color values.
+                width (float, optional): Shaft width. Defaults to 1.0.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
 
         Returns:
             int: Unique ID assigned to this arrow.
         """
-        return _wr.add_arrow(x1, y1, z1, x2, y2, z2, r, g, b, a, width, always_on_top) # type: ignore
+        if isinstance(x1, tuple) and isinstance(y1, tuple) and isinstance(z1, tuple):
+            return _wr.add_arrow(*x1, *y1, *z1, width, always_on_top)  # type: ignore
+        else:
+            return _wr.add_arrow(x1, y1, z1, x2, y2, z2, r, g, b, a, width, always_on_top)  # type: ignore
+
+    @overload
+    @staticmethod
+    def remove_arrow(x1: float = None, y1: float = None, z1: float = None, x2: float = None,
+                     y2: float = None, z2: float = None, *, id: int = None) -> None:
+        ...
+
+    @overload
+    @staticmethod
+    def remove_arrow(pos1: Vec3, pos2: Vec3, /, *, id: int = None) -> None:
+        ...
 
     @staticmethod
-    def remove_arrow(x1: float=None, y1: float=None, z1: float=None, x2: float=None,
-                     y2: float=None, z2: float=None, *, id: int=None):
+    def remove_arrow(x1: float | Vec3 | None = None, y1: float | Vec3 | None = None, z1: float | None = None,
+                     x2: float | None = None, y2: float | None = None, z2: float | None = None, *, id: int | None = None) -> None:
         """
         Remove an arrow by endpoint coordinates or by ID.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: remove_arrow(x1, y1, z1, x2, y2, z2, id=None)
+
+        2. Position tuples: remove_arrow(pos1, pos2, id=None)
+
         Args:
-            x1 (float, optional): X coordinate of the arrow tail.
-            y1 (float, optional): Y coordinate of the arrow tail.
-            z1 (float, optional): Z coordinate of the arrow tail.
-            x2 (float, optional): X coordinate of the arrow head.
-            y2 (float, optional): Y coordinate of the arrow head.
-            z2 (float, optional): Z coordinate of the arrow head.
-            id (int, optional): Unique ID returned by add_arrow. If provided, coordinates are ignored.
+            For the first overload:
+                x1 (float, optional): X coordinate of the arrow tail.
+                y1 (float, optional): Y coordinate of the arrow tail.
+                z1 (float, optional): Z coordinate of the arrow tail.
+                x2 (float, optional): X coordinate of the arrow head.
+                y2 (float, optional): Y coordinate of the arrow head.
+                z2 (float, optional): Z coordinate of the arrow head.
+                id (int, optional): Unique ID returned by add_arrow. If provided, coordinates are ignored.
+
+            For the second overload:
+                pos1 (Vec3): Tuple of (x1, y1, z1) for the arrow tail.
+                pos2 (Vec3): Tuple of (x2, y2, z2) for the arrow head.
+                id (int, optional): Unique ID returned by add_arrow. If provided, positions are ignored.
 
         Returns:
             None
         """
-        _wr.remove_arrow(x1, y1, z1, x2, y2, z2, id)
+        if isinstance(x1, tuple) and isinstance(y1, tuple):
+            _wr.remove_arrow(*x1, *y1, id)
+        else:
+            _wr.remove_arrow(x1, y1, z1, x2, y2, z2, id)
 
     @staticmethod
     def get_arrow_list() -> dict:
@@ -774,44 +1125,98 @@ class WorldRender:
 
     # ── Circles ───────────────────────────────────────────────────────────────
 
+    @overload
     @staticmethod
-    def add_circle(x: float, y: float, z: float, radius: float, r: int=255, g: int=255,
-                   b: int=255, a: int=255, filled: bool=False, always_on_top: bool=True) -> int:
+    def add_circle(x: float, y: float, z: float, radius: float, r: int = 255, g: int = 255,
+                   b: int = 255, a: int = 255, filled: bool = False, always_on_top: bool = True) -> int:
+        ...
+
+    @overload
+    @staticmethod
+    def add_circle(pos: Vec3, radius: float, rgba: tuple[int, int, int, int], filled: bool = False,
+                   always_on_top: bool = True, /) -> int:
+        ...
+
+    @staticmethod
+    def add_circle(x: float | Vec3, y: float | float | None = None, z: float | tuple[int, int, int, int] | None = None,
+                   radius: float | None = None, r: int = 255, g: int = 255, b: int = 255, a: int = 255,
+                   filled: bool = False, always_on_top: bool = True) -> int:
         """
         Add a circle centered at the specified world coordinates.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: add_circle(x, y, z, radius, r=255, g=255, b=255, a=255, filled=False, always_on_top=True)
+
+        2. Position tuple: add_circle(pos, radius, rgba, filled=False, always_on_top=True)
+
         Args:
-            x (float): X coordinate of the center in world space.
-            y (float): Y coordinate of the center in world space.
-            z (float): Z coordinate of the center in world space.
-            radius (float): Radius of the circle in world units.
-            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
-            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
-            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
-            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
-            filled (bool, optional): If True, renders a filled disc; otherwise renders an outline. Defaults to False.
-            always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+            For the first overload:
+                x (float): X coordinate of the center in world space.
+                y (float): Y coordinate of the center in world space.
+                z (float): Z coordinate of the center in world space.
+                radius (float): Radius of the circle in world units.
+                r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+                g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+                b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+                a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+                filled (bool, optional): If True, renders a filled disc; otherwise renders an outline. Defaults to False.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+
+            For the second overload:
+                pos (Vec3): Tuple of (x, y, z) for the center position.
+                radius (float): Radius of the circle in world units.
+                rgba (tuple[int, int, int, int]): Tuple of (r, g, b, a) color values.
+                filled (bool, optional): If True, renders a filled disc; otherwise renders an outline. Defaults to False.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
 
         Returns:
             int: Unique ID assigned to this circle.
         """
-        return _wr.add_circle(x, y, z, radius, r, g, b, a, filled, always_on_top) # type: ignore
+        if isinstance(x, tuple) and isinstance(y, (int, float)) and isinstance(z, tuple):
+            return _wr.add_circle(*x, y, *z, filled, always_on_top)  # type: ignore
+        else:
+            return _wr.add_circle(x, y, z, radius, r, g, b, a, filled, always_on_top)  # type: ignore
+
+    @overload
+    @staticmethod
+    def remove_circle(x: float = None, y: float = None, z: float = None, *, id: int = None) -> None:
+        ...
+
+    @overload
+    @staticmethod
+    def remove_circle(pos: Vec3, /, *, id: int = None) -> None:
+        ...
 
     @staticmethod
-    def remove_circle(x: float=None, y: float=None, z: float=None, *, id: int=None):
+    def remove_circle(x: float | Vec3 | None = None, y: float | None = None, z: float | None = None, *, id: int | None = None) -> None:
         """
         Remove a circle by its center coordinates or by ID.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: remove_circle(x, y, z, id=None)
+
+        2. Position tuple: remove_circle(pos, id=None)
+
         Args:
-            x (float, optional): X coordinate of the center in world space.
-            y (float, optional): Y coordinate of the center in world space.
-            z (float, optional): Z coordinate of the center in world space.
-            id (int, optional): Unique ID returned by add_circle. If provided, coordinates are ignored.
+            For the first overload:
+                x (float, optional): X coordinate of the center in world space.
+                y (float, optional): Y coordinate of the center in world space.
+                z (float, optional): Z coordinate of the center in world space.
+                id (int, optional): Unique ID returned by add_circle. If provided, coordinates are ignored.
+
+            For the second overload:
+                pos (Vec3): Tuple of (x, y, z) for the center position.
+                id (int, optional): Unique ID returned by add_circle. If provided, position is ignored.
 
         Returns:
             None
         """
-        _wr.remove_circle(x, y, z, id)
+        if isinstance(x, tuple):
+            _wr.remove_circle(*x, id)
+        else:
+            _wr.remove_circle(x, y, z, id)
 
     @staticmethod
     def get_circle_list() -> dict:
@@ -825,56 +1230,130 @@ class WorldRender:
 
     # ── Rects ─────────────────────────────────────────────────────────────────
 
+    @overload
     @staticmethod
     def add_rect(x1: float, y1: float, z1: float,
                  x2: float, y2: float, z2: float,
                  x3: float, y3: float, z3: float,
                  x4: float, y4: float, z4: float,
-                 r: int=255, g: int=255, b: int=255, a: int=255,
-                 filled: bool=False, always_on_top: bool=True) -> int:
+                 r: int = 255, g: int = 255, b: int = 255, a: int = 255,
+                 filled: bool = False, always_on_top: bool = True) -> int:
+        ...
+
+    @overload
+    @staticmethod
+    def add_rect(pos1: Vec3, pos2: Vec3, pos3: Vec3, pos4: Vec3,
+                 rgba: tuple[int, int, int, int], filled: bool = False, always_on_top: bool = True, /) -> int:
+        ...
+
+    @staticmethod
+    def add_rect(x1: float | Vec3, y1: float | Vec3 | None = None, z1: float | Vec3 | None = None,
+                 x2: float | Vec3 | None = None, y2: float | tuple[int, int, int, int] | None = None, z2: float | None = None,
+                 x3: float | None = None, y3: float | None = None, z3: float | None = None,
+                 x4: float | None = None, y4: float | None = None, z4: float | None = None,
+                 r: int = 255, g: int = 255, b: int = 255, a: int = 255,
+                 filled: bool = False, always_on_top: bool = True) -> int:
         """
         Add a quadrilateral defined by four world-space corner vertices.
 
         Vertices should be specified in order (e.g. clockwise or counter-clockwise)
         to form a valid planar quad.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: add_rect(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, r=255, g=255, b=255, a=255, filled=False, always_on_top=True)
+
+        2. Position tuples: add_rect(pos1, pos2, pos3, pos4, rgba, filled=False, always_on_top=True)
+
         Args:
-            x1, y1, z1 (float): First corner position.
-            x2, y2, z2 (float): Second corner position.
-            x3, y3, z3 (float): Third corner position.
-            x4, y4, z4 (float): Fourth corner position.
-            r (int, optional): Red channel value in the range 0–255. Defaults to 255.
-            g (int, optional): Green channel value in the range 0–255. Defaults to 255.
-            b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
-            a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
-            filled (bool, optional): If True, renders a filled quad; otherwise renders an outline. Defaults to False.
-            always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+            For the first overload:
+                x1, y1, z1 (float): First corner position.
+                x2, y2, z2 (float): Second corner position.
+                x3, y3, z3 (float): Third corner position.
+                x4, y4, z4 (float): Fourth corner position.
+                r (int, optional): Red channel value in the range 0–255. Defaults to 255.
+                g (int, optional): Green channel value in the range 0–255. Defaults to 255.
+                b (int, optional): Blue channel value in the range 0–255. Defaults to 255.
+                a (int, optional): Alpha/opacity channel in the range 0–255. Defaults to 255 (opaque).
+                filled (bool, optional): If True, renders a filled quad; otherwise renders an outline. Defaults to False.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
+
+            For the second overload:
+                pos1 (Vec3): Tuple of (x1, y1, z1) for the first corner.
+                pos2 (Vec3): Tuple of (x2, y2, z2) for the second corner.
+                pos3 (Vec3): Tuple of (x3, y3, z3) for the third corner.
+                pos4 (Vec3): Tuple of (x4, y4, z4) for the fourth corner.
+                rgba (tuple[int, int, int, int]): Tuple of (r, g, b, a) color values.
+                filled (bool, optional): If True, renders a filled quad; otherwise renders an outline. Defaults to False.
+                always_on_top (bool, optional): If True, renders through blocks. Defaults to True.
 
         Returns:
             int: Unique ID assigned to this rect.
         """
-        return _wr.add_rect(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, r, g, b, a, filled, always_on_top) # type: ignore
+        if isinstance(x1, tuple) and isinstance(y1, tuple) and isinstance(z1, tuple) and isinstance(x2, tuple) and isinstance(y2, tuple):
+            return _wr.add_rect(*x1, *y1, *z1, *x2, *y2, z2, x3)  # type: ignore
+        else:
+            return _wr.add_rect(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, r, g, b, a, filled, always_on_top)  # type: ignore
+
+    @overload
+    @staticmethod
+    def remove_rect(x1: float = None, y1: float = None, z1: float = None,
+                    x2: float = None, y2: float = None, z2: float = None,
+                    x3: float = None, y3: float = None, z3: float = None,
+                    x4: float = None, y4: float = None, z4: float = None,
+                    *, id: int = None) -> None:
+        ...
+
+    @overload
+    @staticmethod
+    def remove_rect(pos1: Vec3, pos2: Vec3, pos3: Vec3, pos4: Vec3, /, *, id: int = None) -> None:
+        ...
 
     @staticmethod
-    def remove_rect(x1: float=None, y1: float=None, z1: float=None,
-                    x2: float=None, y2: float=None, z2: float=None,
-                    x3: float=None, y3: float=None, z3: float=None,
-                    x4: float=None, y4: float=None, z4: float=None,
-                    *, id: int=None):
+    def remove_rect(x1: float | Vec3 | None = None,
+                    y1: float | Vec3 | None = None,
+                    z1: float | Vec3 | None = None,
+                    x2: float | Vec3 | None = None,
+                    y2: float | None = None,
+                    z2: float | None = None,
+                    x3: float | None = None,
+                    y3: float | None = None,
+                    z3: float | None = None,
+                    x4: float | None = None,
+                    y4: float | None = None,
+                    z4: float | None = None, *,
+                    id: int | None = None) -> None:
         """
         Remove a quadrilateral by its four corner coordinates or by ID.
 
+        This function supports two overloads:
+
+        1. Individual coordinates: remove_rect(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, id=None)
+
+        2. Position tuples: remove_rect(pos1, pos2, pos3, pos4, id=None)
+
         Args:
-            x1, y1, z1 (float, optional): First corner position.
-            x2, y2, z2 (float, optional): Second corner position.
-            x3, y3, z3 (float, optional): Third corner position.
-            x4, y4, z4 (float, optional): Fourth corner position.
-            id (int, optional): Unique ID returned by add_rect. If provided, coordinates are ignored.
+            For the first overload:
+                x1, y1, z1 (float, optional): First corner position.
+                x2, y2, z2 (float, optional): Second corner position.
+                x3, y3, z3 (float, optional): Third corner position.
+                x4, y4, z4 (float, optional): Fourth corner position.
+                id (int, optional): Unique ID returned by add_rect. If provided, coordinates are ignored.
+
+            For the second overload:
+                pos1 (Vec3): Tuple of (x1, y1, z1) for the first corner.
+                pos2 (Vec3): Tuple of (x2, y2, z2) for the second corner.
+                pos3 (Vec3): Tuple of (x3, y3, z3) for the third corner.
+                pos4 (Vec3): Tuple of (x4, y4, z4) for the fourth corner.
+                id (int, optional): Unique ID returned by add_rect. If provided, positions are ignored.
 
         Returns:
             None
         """
-        _wr.remove_rect(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, id)
+        if isinstance(x1, tuple) and isinstance(y1, tuple) and isinstance(z1, tuple) and isinstance(x2, tuple):
+            _wr.remove_rect(*x1, *y1, *z1, *x2, id)
+        else:
+            _wr.remove_rect(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, id)
 
     @staticmethod
     def get_rect_list() -> dict:

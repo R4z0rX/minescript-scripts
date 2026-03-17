@@ -1,8 +1,8 @@
 """
     Minescript Plus
-    Version: 0.16.2-alpha
+    Version: 0.16.3-alpha
     Author: RazrCraft
-    Date: 2026-03-04
+    Date: 2026-03-17
 
     User-friendly API for scripts that adds extra functionality to the
     Minescript mod, using java built-in module and other libraries.
@@ -43,7 +43,7 @@ except ModuleNotFoundError:
 set_default_executor(script_loop)
 echo_json.set_required_executor(render_loop)
 
-_ver: str = "0.16.2-alpha"
+_ver: str = "0.16.3-alpha"
 
 if svi < (3, 10):
     exit("Minescript Plus requires Python 3.10 or later.")
@@ -1623,8 +1623,10 @@ def _check_ver(ver: str) -> bool:
         check = check and mc_version[i] >= ver_parts[i]
     return check
 
+UUID = JavaClass("java.util.UUID")
 Minecraft = JavaClass("net.minecraft.client.Minecraft")
-HudRenderCallback = JavaClass("net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback")
+HudElementRegistry = JavaClass("net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry")
+VanillaHudElements = JavaClass("net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements")
 ARGB = JavaClass("net.minecraft.util.ARGB")
 Component = JavaClass("net.minecraft.network.chat.Component")
 ChatFormatting = JavaClass("net.minecraft.ChatFormatting")
@@ -1830,73 +1832,81 @@ def on_hud_render(guiGraphics, tickDeltaManager):
     winx = int(mc.getWindow().getGuiScaledWidth())
     winy = int(mc.getWindow().getGuiScaledHeight())
     screen = str(screen_name())  # None object gets turned into "None" here
-    for t in _texts:
-        # _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool, float, float]]
-        state, text, x, y, r, g, b, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY, screens = _texts[t]
-        
-        found = (screens == "all") or (screen in screens)
 
-        if state and found:
-            styled_text = Component.literal(text)
-            if italic:
-                styled_text = styled_text.withStyle(ChatFormatting.ITALIC)
-            if underline:
-                styled_text = styled_text.withStyle(ChatFormatting.UNDERLINE)
-            if strikethrough:
-                styled_text = styled_text.withStyle(ChatFormatting.STRIKETHROUGH)
-            if obfsucated:
-                styled_text = styled_text.withStyle(ChatFormatting.OBFUSCATED)
-            color: int = ARGB.color(alpha, r, g, b)
+    try:
+        for t in _texts:
+            # _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bool, bool, bool, bool, float, float]]
+            state, text, x, y, r, g, b, alpha, scale, shadow, italic, underline, strikethrough, obfsucated, anchorX, anchorY, screens = _texts[t]
             
-            scale = scale.floatValue()
-            pose_stack = guiGraphics.pose()
-            if _check_ver("1.21.6"):
-                pose_stack.pushMatrix()
-                pose_stack.scale(scale, scale)
-            else:
-                pose_stack.pushPose()
-                pose_stack.scale(scale, scale, 0)
-            scaled_X: int = int((x / scale) + (anchorX * winx / scale))
-            scaled_Y: int = int((y / scale) + (anchorY * winy / scale))
+            found = (screens == "all") or (screen in screens)
+
+            if state and found:
+                styled_text = Component.literal(text)
+                if italic:
+                    styled_text = styled_text.withStyle(ChatFormatting.ITALIC)
+                if underline:
+                    styled_text = styled_text.withStyle(ChatFormatting.UNDERLINE)
+                if strikethrough:
+                    styled_text = styled_text.withStyle(ChatFormatting.STRIKETHROUGH)
+                if obfsucated:
+                    styled_text = styled_text.withStyle(ChatFormatting.OBFUSCATED)
+                color: int = ARGB.color(alpha, r, g, b)
+                
+                scale = scale.floatValue()
+                pose_stack = guiGraphics.pose()
+                if _check_ver("1.21.6"):
+                    pose_stack.pushMatrix()
+                    pose_stack.scale(scale, scale)
+                else:
+                    pose_stack.pushPose()
+                    pose_stack.scale(scale, scale, 0)
+                scaled_X: int = int((x / scale) + (anchorX * winx / scale))
+                scaled_Y: int = int((y / scale) + (anchorY * winy / scale))
+                
+                guiGraphics.drawString(mc.font, styled_text, scaled_X, scaled_Y, color, shadow)
+                
+                if _check_ver("1.21.6"):
+                    pose_stack.popMatrix()
+                else:
+                    pose_stack.popPose()
+    except:
+        pass
+
+    try:
+        for i in _items:
+            state, item_id, x, y, count, scale, anchorX, anchorY, screens = _items[i]
             
-            guiGraphics.drawString(mc.font, styled_text, scaled_X, scaled_Y, color, shadow)
+            found = (screens == "all") or (screen in screens)
             
-            if _check_ver("1.21.6"):
-                pose_stack.popMatrix()
-            else:
-                pose_stack.popPose()
-    
-    for i in _items:
-        state, item_id, x, y, count, scale, anchorX, anchorY, screens = _items[i]
-        
-        found = (screens == "all") or (screen in screens)
-        
-        if state and found:
-            scale = scale.floatValue()
-            pose_stack = guiGraphics.pose()
-            if _check_ver("1.21.6"):
-                pose_stack.pushMatrix()
-                pose_stack.scale(scale, scale)
-            else:
-                pose_stack.pushPose()
-                pose_stack.scale(scale, scale, 0)
-            scaled_X: int = int((x / scale) + (anchorX * winx / scale))
-            scaled_Y: int = int((y / scale) + (anchorY * winy / scale))
-            
-            item = _get_item_from_itemid(item_id)
-            item_stack = ItemStack(item)
-            
-            guiGraphics.renderItem(item_stack, scaled_X, scaled_Y)
-            if count != "":
-                render_item_count(guiGraphics, mc.font, item_stack, scaled_X, scaled_Y, count)
-            
-            if _check_ver("1.21.6"):
-                pose_stack.popMatrix()
-            else:
-                pose_stack.popPose()
+            if state and found:
+                scale = scale.floatValue()
+                pose_stack = guiGraphics.pose()
+                if _check_ver("1.21.6"):
+                    pose_stack.pushMatrix()
+                    pose_stack.scale(scale, scale)
+                else:
+                    pose_stack.pushPose()
+                    pose_stack.scale(scale, scale, 0)
+                scaled_X: int = int((x / scale) + (anchorX * winx / scale))
+                scaled_Y: int = int((y / scale) + (anchorY * winy / scale))
+                
+                item = _get_item_from_itemid(item_id)
+                item_stack = ItemStack(item)
+                
+                guiGraphics.renderItem(item_stack, scaled_X, scaled_Y)
+                if count != "":
+                    render_item_count(guiGraphics, mc.font, item_stack, scaled_X, scaled_Y, count)
+                
+                if _check_ver("1.21.6"):
+                    pose_stack.popMatrix()
+                else:
+                    pose_stack.popPose()
+    except:
+        pass
 
 callback = ManagedCallback(on_hud_render)
-HudRenderCallback.EVENT.register(HudRenderCallback(callback))
+id = ResourceLocation.fromNamespaceAndPath("minescript", UUID.randomUUID().toString())
+HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, id, callback)
 
     """)
 
