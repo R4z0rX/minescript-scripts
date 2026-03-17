@@ -828,8 +828,7 @@ class Client:
         This function calls the network handler's disconnect method, passing a literal text message
         to indicate that the disconnection was initiated by the user.
         """
-        mc.player.connection.getConnection().disconnect(
-            Component.literal("Disconnected by user"))
+        mc.player.connection.getConnection().disconnect(Component.translatable("multiplayer.disconnect.generic"))
 
     @staticmethod
     def get_options():
