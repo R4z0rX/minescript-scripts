@@ -1,11 +1,11 @@
 """
     @author RazrCraft
     @create date 2025-07-08 12:59:08
-    @modify date 2025-07-16 19:40:46
+    @modify date 2026-03-28 13:14:30
     @desc Simple actionbar event example using @Event.event decorator for registering the event
  """
 import asyncio
-from minescript import tick_loop
+from minescript import script_loop
 from minescript_plus import Event
 
 loop: bool = True
@@ -23,7 +23,7 @@ async def main():
     print("You can use this command to test it: /title @s actionbar \"Test!\"")
     print("Waiting for actionbar...")
     
-    with tick_loop:
+    with script_loop:
         while loop:
             await asyncio.sleep(0.05)
 
