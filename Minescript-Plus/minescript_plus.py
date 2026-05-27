@@ -1647,6 +1647,8 @@ _texts: dict[int, tuple[bool, str, int, int, int, int, int, int, float, bool, bo
 _ti: int = 0
 _items: dict[int, tuple[bool, str, int, int, str, float, float, float, list]] = {}
 _ii: int = 0
+_free_text_ids: list[int] = []
+_free_item_ids: list[int] = []
 
 def _check_ver(ver: str) -> bool:
     _mc_ver = version_info().minecraft
@@ -1677,10 +1679,16 @@ def update_tuple(old_tuple, new_values):
 def _add_text(*t):
     global _texts
     global _ti
+    global _free_text_ids
     
-    _texts[_ti] = tuple(t)
-    _ti += 1
-    return _ti - 1
+    if _free_text_ids:
+        idx = _free_text_ids.pop()
+    else:
+        idx = _ti
+        _ti += 1
+    
+    _texts[idx] = tuple(t)
+    return idx
 
 def _update_text(index: int, *t):
     global _texts
@@ -1707,10 +1715,10 @@ def _set_text_position(index: int, x: int, y: int):
     
 def _remove_text(i):
     global _texts
-    global _ti
-
+    global _free_text_ids
+    
     del _texts[i]
-    _ti -= 1
+    _free_text_ids.append(i)
 
 def _clear_texts():
     global _texts
@@ -1762,10 +1770,16 @@ def _get_item_name(item: Item) -> str:
 def _add_item(*t):
     global _items
     global _ii
+    global _free_item_ids
     
-    _items[_ii] = tuple(t)
-    _ii += 1
-    return _ii - 1
+    if _free_item_ids:
+        idx = _free_item_ids.pop()
+    else:
+        idx = _ii
+        _ii += 1
+    
+    _items[idx] = tuple(t)
+    return idx
 
 def _update_item(index: int, *t):
     global _items
@@ -1801,10 +1815,10 @@ def _set_item_count(index: int, count: str):
         
 def _remove_item(i):
     global _items
-    global _ti
+    global _free_item_ids
 
     del _items[i]
-    _ii -= 1
+    _free_item_ids.append(i)
 
 def _clear_items():
     global _items
